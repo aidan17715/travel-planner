@@ -5,10 +5,24 @@ const KEY = 'travel-planner:trips:v1'
 
 export const uid = () => crypto.randomUUID()
 
+const normalize = (t: Partial<Trip>): Trip => ({
+  id: t.id ?? uid(),
+  name: t.name ?? 'Untitled trip',
+  destination: t.destination ?? '',
+  startDate: t.startDate ?? '',
+  endDate: t.endDate ?? '',
+  currency: t.currency ?? 'USD',
+  budget: Number(t.budget) || 0,
+  itinerary: t.itinerary ?? [],
+  hotels: t.hotels ?? {},
+  expenses: t.expenses ?? [],
+  packing: t.packing ?? [],
+})
+
 function load(): Trip[] {
   try {
     const raw = localStorage.getItem(KEY)
-    return raw ? (JSON.parse(raw) as Trip[]) : []
+    return raw ? (JSON.parse(raw) as Partial<Trip>[]).map(normalize) : []
   } catch {
     return []
   }
@@ -45,16 +59,5 @@ export function exportTrips(trips: Trip[]) {
 export async function importTrips(file: File): Promise<Trip[]> {
   const data: unknown = JSON.parse(await file.text())
   if (!Array.isArray(data)) throw new Error('Not a valid backup file')
-  return data.map((t: Partial<Trip>) => ({
-    id: t.id ?? uid(),
-    name: t.name ?? 'Untitled trip',
-    destination: t.destination ?? '',
-    startDate: t.startDate ?? '',
-    endDate: t.endDate ?? '',
-    currency: t.currency ?? 'USD',
-    budget: Number(t.budget) || 0,
-    itinerary: t.itinerary ?? [],
-    expenses: t.expenses ?? [],
-    packing: t.packing ?? [],
-  }))
+  return data.map((t: Partial<Trip>) => normalize(t))
 }

@@ -30,6 +30,7 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
       currency: currency.trim().toUpperCase() || 'USD',
       budget: Number(budget) || 0,
       itinerary: [],
+      hotels: {},
       expenses: [],
       packing: [],
     }
@@ -78,11 +79,11 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
           <div className="row">
             <label>
               Start
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
             </label>
             <label>
               End
-              <input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+              <input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} required />
             </label>
           </div>
           <div className="row">

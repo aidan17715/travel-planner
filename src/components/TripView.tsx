@@ -30,6 +30,27 @@ export function TripView({ trip, onChange, onDelete, onBack }: Props) {
       <h2>{trip.name}</h2>
       <p className="muted">{trip.destination}</p>
 
+      <div className="row dates">
+        <label>
+          Start
+          <input
+            type="date"
+            value={trip.startDate}
+            max={trip.endDate || undefined}
+            onChange={(e) => onChange((t) => ({ ...t, startDate: e.target.value }))}
+          />
+        </label>
+        <label>
+          End
+          <input
+            type="date"
+            value={trip.endDate}
+            min={trip.startDate || undefined}
+            onChange={(e) => onChange((t) => ({ ...t, endDate: e.target.value }))}
+          />
+        </label>
+      </div>
+
       <nav className="tabs" role="tablist">
         {TABS.map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>

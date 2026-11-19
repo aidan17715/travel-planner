@@ -23,6 +23,12 @@ export interface PackItem {
   packed: boolean
 }
 
+export interface Hotel {
+  name: string
+  address: string
+  notes: string
+}
+
 export interface Trip {
   id: string
   name: string
@@ -32,6 +38,7 @@ export interface Trip {
   currency: string
   budget: number
   itinerary: ItineraryItem[]
+  hotels: Record<string, Hotel>
   expenses: Expense[]
   packing: PackItem[]
 }

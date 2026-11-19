@@ -76,3 +76,21 @@ a { color: var(--brand); }
 .check { flex-direction: row; align-items: center; gap: .6rem; color: var(--text); font-size: 1rem; }
 .check input { width: 1.2rem; height: 1.2rem; }
 .done { text-decoration: line-through; color: var(--muted); }
+
+.dates { margin-top: .75rem; }
+
+.days { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
+.day-card { background: var(--card); border: 1px solid var(--border); border-radius: .9rem; padding: 1rem; }
+.day-card h3 { margin: 0 0 .75rem; display: flex; justify-content: space-between; align-items: baseline; font-size: 1.05rem; }
+.day-date { color: var(--muted); font-weight: 400; font-size: .9rem; }
+.day-card h4 { margin: .75rem 0 .4rem; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.day-card .list li { background: var(--bg); }
+.item { display: flex; justify-content: space-between; gap: .75rem; align-items: flex-start; background: var(--bg); border: 1px solid var(--border); border-radius: .7rem; padding: .7rem .9rem; }
+.item > div:first-child, .list li > div:first-child { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.item-actions { display: flex; align-items: center; gap: .25rem; }
+.blank { display: flex; justify-content: space-between; align-items: center; gap: .5rem; border: 1px dashed var(--border); border-radius: .7rem; padding: .5rem .75rem; }
+.blank-text { margin: 0 0 .5rem; }
+.add-btn { width: 100%; margin-top: .5rem; border-style: dashed; color: var(--brand); }
+.link { border: none; background: none; color: var(--brand); padding: .25rem .5rem; }
+.inline-form { display: flex; flex-direction: column; gap: .65rem; margin-top: .5rem; padding: .75rem; border-radius: .7rem; background: var(--bg); border: 1px solid var(--border); }
+.inline-form input { background: var(--card); }
