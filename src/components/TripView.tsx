@@ -1,12 +1,16 @@
 import { useState } from 'react'
+import type { Cloud } from '../cloud/useCloud.ts'
 import type { Trip } from '../types.ts'
+import { SyncBadge } from './Account.tsx'
 import { Budget } from './Budget.tsx'
 import { Flights } from './Flights.tsx'
 import { Itinerary } from './Itinerary.tsx'
 import { Overview } from './Overview.tsx'
+import { ShareDialog } from './ShareDialog.tsx'
 
 interface Props {
   trip: Trip
+  cloud: Cloud
   onChange: (patch: (t: Trip) => Trip) => void
   onDelete: () => void
   onBack: () => void
@@ -15,12 +19,20 @@ interface Props {
 const TABS = ['Itinerary', 'Flights', 'Expenses'] as const
 type Tab = (typeof TABS)[number]
 
-export function TripView({ trip, onChange, onDelete, onBack }: Props) {
+export function TripView({ trip, cloud, onChange, onDelete, onBack }: Props) {
   const [tab, setTab] = useState<Tab>('Itinerary')
   const [showOverview, setShowOverview] = useState(false)
+  const [showShare, setShowShare] = useState(false)
+
+  const isOwner = !!trip.cloud && trip.cloud.ownerId === cloud.user?.id
 
   const confirmDelete = () => {
-    if (confirm(`Delete "${trip.name}"? This cannot be undone.`)) onDelete()
+    const message = !trip.cloud
+      ? `Delete "${trip.name}"? This cannot be undone.`
+      : isOwner
+        ? `Delete "${trip.name}"? It's shared, so this also deletes it for everyone who joined. This cannot be undone.`
+        : `Remove "${trip.name}" from your trips? You'll leave the shared trip. Others keep it.`
+    if (confirm(message)) onDelete()
   }
 
   // Flights sitting on the old start/end date move along with the trip dates
@@ -40,11 +52,16 @@ export function TripView({ trip, onChange, onDelete, onBack }: Props) {
       <div className="trip-head">
         <button onClick={onBack}>← Trips</button>
         <button className="primary" onClick={() => setShowOverview(true)}>🗺️ Overview</button>
+        {cloud.configured && <button onClick={() => setShowShare(true)}>{trip.cloud ? '👥 Shared' : '👥 Share'}</button>}
         <button className="danger" onClick={confirmDelete}>Delete</button>
       </div>
       {showOverview && <Overview trip={trip} onClose={() => setShowOverview(false)} />}
+      {showShare && <ShareDialog trip={trip} cloud={cloud} onClose={() => setShowShare(false)} />}
       <h2>{trip.name}</h2>
-      <p className="muted">{trip.destination}</p>
+      <p className="muted">
+        {trip.destination}
+        {trip.cloud && <> · <SyncBadge cloud={cloud} /></>}
+      </p>
 
       <div className="row dates">
         <label>

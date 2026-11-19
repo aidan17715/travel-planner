@@ -1,11 +1,15 @@
 import { useRef, useState } from 'react'
+import { useCloud } from './cloud/useCloud.ts'
+import { AccountBar, InviteBanner } from './components/Account.tsx'
 import { TripList } from './components/TripList.tsx'
 import { TripView } from './components/TripView.tsx'
 import { exportTrips, importTrips, useTrips } from './storage.ts'
+import type { Trip } from './types.ts'
 import './App.css'
 
 export default function App() {
-  const { trips, addTrip, updateTrip, deleteTrip, replaceAll } = useTrips()
+  const { trips, addTrip, updateTrip, deleteTrip, replaceAll, store } = useTrips()
+  const cloud = useCloud(store, trips)
   const [openId, setOpenId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -17,14 +21,39 @@ export default function App() {
     if (!file) return
     try {
       const imported = await importTrips(file)
-      if (confirm(`Replace your current trips with ${imported.length} trip(s) from this file?`)) {
-        replaceAll(imported)
+      // Shared trips live in the cloud, so an old backup must never overwrite them
+      const shared = trips.filter((t) => t.cloud)
+      const incoming = imported.filter((t) => !shared.some((s) => s.id === t.id))
+      const note = shared.length > 0 ? ` Your ${shared.length} shared trip(s) stay as they are.` : ''
+      if (confirm(`Replace your current trips with ${incoming.length} trip(s) from this file?${note}`)) {
+        replaceAll([...shared, ...incoming])
         setOpenId(null)
       }
     } catch {
       alert('Could not read that file. Please choose a Travel Planner backup (.json).')
     }
   }
+
+  // Deleting a shared trip also leaves it (or, for the owner, stops sharing it) in the cloud
+  const removeTrip = async (t: Trip) => {
+    if (t.cloud) {
+      if (!cloud.engine) {
+        alert('Go online and sign in to delete a shared trip.')
+        return
+      }
+      try {
+        if (t.cloud.ownerId === cloud.user?.id) await cloud.engine.stopSharing(t.id)
+        else await cloud.engine.leave(t.id)
+      } catch (e) {
+        alert(e instanceof Error ? e.message : 'Could not remove the shared trip. Try again.')
+        return
+      }
+    }
+    deleteTrip(t.id)
+    setOpenId(null)
+  }
+
+  const joinedName = cloud.invite?.state === 'joined' ? trips.find((t) => t.id === (cloud.invite as { tripId: string }).tripId)?.name : undefined
 
   return (
     <div className="app">
@@ -38,15 +67,15 @@ export default function App() {
           </div>
         )}
       </header>
+      <InviteBanner cloud={cloud} tripName={joinedName} onOpen={setOpenId} />
+      {!trip && cloud.invite?.state !== 'needsSignIn' && <AccountBar cloud={cloud} />}
       <main>
         {trip ? (
           <TripView
             trip={trip}
+            cloud={cloud}
             onChange={(patch) => updateTrip(trip.id, patch)}
-            onDelete={() => {
-              deleteTrip(trip.id)
-              setOpenId(null)
-            }}
+            onDelete={() => void removeTrip(trip)}
             onBack={() => setOpenId(null)}
           />
         ) : (

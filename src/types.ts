@@ -93,4 +93,6 @@ export interface Trip {
   settlements: Settlement[]
   // Splitwise-style "simplify debts": reroute debts through the group to need fewer payments
   simplify: boolean
+  // Local-only marker: set when this trip is shared through the cloud. Never stored remotely.
+  cloud?: { ownerId: string }
 }

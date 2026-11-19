@@ -145,7 +145,17 @@ a { color: var(--brand); }
 .custom-amounts label { flex-direction: row; align-items: center; justify-content: space-between; gap: .75rem; color: var(--text); font-size: 1rem; }
 .custom-amounts input { width: 8rem; }
 
-.trip-head { gap: .5rem; }
+.trip-head { gap: .5rem; flex-wrap: wrap; }
+
+.account { flex-direction: row; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.account > div:first-child { display: flex; flex-direction: column; gap: .2rem; flex: 1; min-width: 12rem; }
+.account-chip { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin: .25rem 0 .75rem; font-size: .85rem; color: var(--muted); }
+.account-chip .link { margin-left: auto; }
+.badge { align-self: flex-start; padding: .1rem .5rem; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); }
+.dialog { max-width: 36rem; margin: 0 auto; }
+.create-link { align-self: flex-end; }
+.danger-text { color: var(--danger); }
+.list li.stack > input { width: 100%; font-size: .85rem; }
 
 .overlay {
   position: fixed; inset: 0; z-index: 50; overflow-y: auto; background: var(--bg);

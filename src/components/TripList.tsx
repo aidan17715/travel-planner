@@ -61,6 +61,7 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
             <button className="card" onClick={() => onOpen(t.id)}>
               <strong>{t.name}</strong>
               <span>{t.destination}</span>
+              {t.cloud && <small className="badge">👥 Shared</small>}
               <small>{t.startDate ? `${fmt(t.startDate)}${t.endDate ? ' – ' + fmt(t.endDate) : ''}` : 'No dates set'}</small>
             </button>
           </li>

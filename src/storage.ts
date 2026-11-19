@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { listDays } from './dates.ts'
 import type { Flight, Stay, Trip } from './types.ts'
 
@@ -49,7 +49,7 @@ function staysFromLegacy(hotels: LegacyHotels, currency: string): Stay[] {
 }
 
 // Older data has no per-cost currency, so those costs take the trip's currency
-const normalize = (t: Partial<Trip> & { hotels?: LegacyHotels }): Trip => {
+export const normalize = (t: Partial<Trip> & { hotels?: LegacyHotels }): Trip => {
   const startDate = t.startDate ?? ''
   const endDate = t.endDate ?? ''
   const currency = t.currency ?? 'SGD'
@@ -74,6 +74,7 @@ const normalize = (t: Partial<Trip> & { hotels?: LegacyHotels }): Trip => {
     splits: t.splits ?? {},
     settlements: (t.settlements ?? []).map((s) => ({ ...s, currency: s.currency ?? currency })),
     simplify: t.simplify ?? false,
+    cloud: t.cloud,
   }
 }
 
@@ -88,24 +89,34 @@ function load(): Trip[] {
 
 export function useTrips() {
   const [trips, setTrips] = useState<Trip[]>(load)
+  // The latest trips, readable synchronously. The cloud sync engine edits trips outside of React
+  // renders, so every change goes through `apply` to keep this and the React state in step.
+  const ref = useRef(trips)
+
+  const apply = useCallback((fn: (t: Trip[]) => Trip[]) => {
+    ref.current = fn(ref.current)
+    setTrips(ref.current)
+  }, [])
 
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(trips))
   }, [trips])
 
-  const addTrip = useCallback((trip: Trip) => setTrips((t) => [trip, ...t]), [])
+  const addTrip = useCallback((trip: Trip) => apply((t) => [trip, ...t]), [apply])
   const updateTrip = useCallback(
-    (id: string, patch: (trip: Trip) => Trip) => setTrips((t) => t.map((x) => (x.id === id ? patch(x) : x))),
-    [],
+    (id: string, patch: (trip: Trip) => Trip) => apply((t) => t.map((x) => (x.id === id ? patch(x) : x))),
+    [apply],
   )
-  const deleteTrip = useCallback((id: string) => setTrips((t) => t.filter((x) => x.id !== id)), [])
-  const replaceAll = useCallback((next: Trip[]) => setTrips(next), [])
+  const deleteTrip = useCallback((id: string) => apply((t) => t.filter((x) => x.id !== id)), [apply])
+  const replaceAll = useCallback((next: Trip[]) => apply(() => next), [apply])
+  const store = useMemo(() => ({ get: () => ref.current, update: apply }), [apply])
 
-  return { trips, addTrip, updateTrip, deleteTrip, replaceAll }
+  return { trips, addTrip, updateTrip, deleteTrip, replaceAll, store }
 }
 
 export function exportTrips(trips: Trip[]) {
-  const blob = new Blob([JSON.stringify(trips, null, 2)], { type: 'application/json' })
+  // The cloud marker only makes sense on the device that has it, so it isn't exported
+  const blob = new Blob([JSON.stringify(trips.map(({ cloud: _cloud, ...t }) => t), null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -117,5 +128,5 @@ export function exportTrips(trips: Trip[]) {
 export async function importTrips(file: File): Promise<Trip[]> {
   const data: unknown = JSON.parse(await file.text())
   if (!Array.isArray(data)) throw new Error('Not a valid backup file')
-  return data.map((t: Partial<Trip>) => normalize(t))
+  return data.map((t: Partial<Trip>) => ({ ...normalize(t), cloud: undefined }))
 }
