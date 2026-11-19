@@ -75,6 +75,7 @@ export const normalize = (t: Partial<Trip> & { hotels?: LegacyHotels }): Trip =>
     settlements: (t.settlements ?? []).map((s) => ({ ...s, currency: s.currency ?? currency })),
     simplify: t.simplify ?? false,
     cloud: t.cloud,
+    example: t.example,
   }
 }
 

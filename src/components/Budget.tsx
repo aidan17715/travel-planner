@@ -9,6 +9,7 @@ import { Split } from './Split.tsx'
 interface Props {
   trip: Trip
   onChange: (patch: (t: Trip) => Trip) => void
+  startInSplit?: boolean
 }
 
 const COLORS: Record<ExpenseCategory, string> = {
@@ -81,12 +82,12 @@ function SpendingRing({ slices, total, currency, showCurrency }: RingProps) {
   )
 }
 
-export function Budget({ trip, onChange }: Props) {
+export function Budget({ trip, onChange, startInSplit }: Props) {
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<ExpenseCategory>('Food')
   const [amount, setAmount] = useState('')
   const [currency, setCurrency] = useState<string | null>(null)
-  const [splitMode, setSplitMode] = useState(false)
+  const [splitMode, setSplitMode] = useState(startInSplit ?? false)
 
   const lines = budgetLines(trip)
   const currencies = currenciesIn(trip, lines.map((l) => l.currency))

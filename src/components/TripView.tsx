@@ -7,10 +7,13 @@ import { Flights } from './Flights.tsx'
 import { Itinerary } from './Itinerary.tsx'
 import { Overview } from './Overview.tsx'
 import { ShareDialog } from './ShareDialog.tsx'
+import type { TutorialView } from '../tutorial.ts'
 
 interface Props {
   trip: Trip
   cloud: Cloud
+  // Which screen to start on; the tutorial uses this to walk through the app
+  initialView?: TutorialView
   onChange: (patch: (t: Trip) => Trip) => void
   onDelete: () => void
   onBack: () => void
@@ -19,9 +22,9 @@ interface Props {
 const TABS = ['Itinerary', 'Flights', 'Expenses'] as const
 type Tab = (typeof TABS)[number]
 
-export function TripView({ trip, cloud, onChange, onDelete, onBack }: Props) {
-  const [tab, setTab] = useState<Tab>('Itinerary')
-  const [showOverview, setShowOverview] = useState(false)
+export function TripView({ trip, cloud, initialView, onChange, onDelete, onBack }: Props) {
+  const [tab, setTab] = useState<Tab>(initialView?.tab ?? 'Itinerary')
+  const [showOverview, setShowOverview] = useState(initialView?.overview ?? false)
   const [showShare, setShowShare] = useState(false)
 
   const isOwner = !!trip.cloud && trip.cloud.ownerId === cloud.user?.id
@@ -94,7 +97,7 @@ export function TripView({ trip, cloud, onChange, onDelete, onBack }: Props) {
 
       {tab === 'Itinerary' && <Itinerary trip={trip} onChange={onChange} />}
       {tab === 'Flights' && <Flights trip={trip} onChange={onChange} />}
-      {tab === 'Expenses' && <Budget trip={trip} onChange={onChange} />}
+      {tab === 'Expenses' && <Budget trip={trip} onChange={onChange} startInSplit={initialView?.split} />}
     </section>
   )
 }

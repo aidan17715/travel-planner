@@ -7,11 +7,12 @@ interface Props {
   trips: Trip[]
   onOpen: (id: string) => void
   onAdd: (trip: Trip) => void
+  onGuide: () => void
 }
 
 const fmt = (d: string) => (d ? new Date(d + 'T00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '')
 
-export function TripList({ trips, onOpen, onAdd }: Props) {
+export function TripList({ trips, onOpen, onAdd, onGuide }: Props) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [destination, setDestination] = useState('')
@@ -52,6 +53,9 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
         <div className="empty">
           <p>No trips yet.</p>
           <p>Create your first trip to start planning.</p>
+          <p>
+            New here? <button className="link" onClick={onGuide}>Open the guide</button> or try the example trip.
+          </p>
         </div>
       )}
 
@@ -61,6 +65,7 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
             <button className="card" onClick={() => onOpen(t.id)}>
               <strong>{t.name}</strong>
               <span>{t.destination}</span>
+              {t.example && <small className="badge">📘 Example</small>}
               {t.cloud && <small className="badge">👥 Shared</small>}
               <small>{t.startDate ? `${fmt(t.startDate)}${t.endDate ? ' – ' + fmt(t.endDate) : ''}` : 'No dates set'}</small>
             </button>

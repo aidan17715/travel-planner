@@ -95,4 +95,6 @@ export interface Trip {
   simplify: boolean
   // Local-only marker: set when this trip is shared through the cloud. Never stored remotely.
   cloud?: { ownerId: string }
+  // The built-in example trip used by the tutorial
+  example?: boolean
 }
