@@ -57,18 +57,30 @@ export function Overview({ trip, onClose }: Props) {
                   {stays.map((s) => (
                     <div className="ov-hotel" key={s.id}>
                       <strong>🏨 {s.name}</strong>
+                      <small>Tonight</small>
                       {date === s.startDate && s.checkInTime && <small>🔑 Check-in {s.checkInTime}</small>}
-                      {date === s.endDate && s.checkOutTime && <small>🚪 Check-out {s.checkOutTime}</small>}
                     </div>
                   ))}
 
                   {entries.length === 0 && stays.length === 0 && <p className="muted">Nothing planned yet</p>}
 
                   <ul className="list">
-                    {entries.map((entry) =>
-                      entry.kind === 'flight' ? (
-                        <FlightRow key={`f-${entry.flight.id}`} flight={entry.flight} date={date} />
-                      ) : (
+                    {entries.map((entry) => {
+                      if (entry.kind === 'flight') return <FlightRow key={`f-${entry.flight.id}`} flight={entry.flight} date={date} />
+                      if (entry.kind === 'checkout') {
+                        return (
+                          <li key={`co-${entry.stay.id}`}>
+                            <div>
+                              <strong>
+                                <span className="emoji">🚪</span>
+                                {entry.stay.checkOutTime && <span className="time">{entry.stay.checkOutTime}</span>} Check out
+                              </strong>
+                              <small>{entry.stay.name}</small>
+                            </div>
+                          </li>
+                        )
+                      }
+                      return (
                         <li key={entry.activity.id}>
                           <div>
                             <strong>
@@ -79,8 +91,8 @@ export function Overview({ trip, onClose }: Props) {
                             {entry.activity.cost > 0 && <small>💰 {formatMoney(entry.activity.cost, entry.activity.currency)}</small>}
                           </div>
                         </li>
-                      ),
-                    )}
+                      )
+                    })}
                   </ul>
                 </section>
               )

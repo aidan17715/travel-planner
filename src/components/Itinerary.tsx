@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { fmtDate, listDays } from '../dates.ts'
+import { fmtDate } from '../dates.ts'
 import { activityEmoji } from '../emoji.ts'
 import { formatMoney } from '../money.ts'
-import { dayEntries, staysOn, tripDays } from '../schedule.ts'
+import { dayEntries, nightsOf, staysOn, tripDays } from '../schedule.ts'
 import { uid } from '../storage.ts'
 import type { ItineraryItem, Stay, Trip } from '../types.ts'
 import { CurrencySelect } from './CurrencySelect.tsx'
@@ -50,12 +50,19 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
 
   const stays = staysOn(trip, date)
   const entries = dayEntries(trip, date)
+  // No hotel is needed for the night after the trip's final day
+  const hideHotel = stays.length === 0 && date === days[days.length - 1]
 
   const removeActivity = (id: string) => onChange((t) => ({ ...t, itinerary: t.itinerary.filter((i) => i.id !== id) }))
 
+  const saveStay = (id: string, values: StayValues) => {
+    onChange((t) => ({ ...t, stays: t.stays.map((x) => (x.id === id ? { ...x, ...values } : x)) }))
+    setEditingStay(null)
+  }
+
   const removeStay = (s: Stay) => {
-    const multi = s.startDate !== s.endDate
-    if (multi && !confirm(`Remove "${s.name}" from all ${listDays(s.startDate, s.endDate).length} days of this stay?`)) return
+    const nights = nightsOf(s)
+    if (nights > 1 && !confirm(`Remove "${s.name}" (${nights} nights) from every day of this stay?`)) return
     onChange((t) => ({ ...t, stays: t.stays.filter((x) => x.id !== s.id) }))
   }
 
@@ -66,9 +73,9 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
         <span className="day-date">{fmtDate(date)}</span>
       </h3>
 
-      {date && (
+      {date && !hideHotel && (
         <section>
-          <h4>🏨 Hotel</h4>
+          <h4>🏨 Hotel tonight</h4>
           {stays.map((s) =>
             editingStay === s.id ? (
               <StayForm
@@ -78,20 +85,18 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
                 defaultDate={date}
                 currency={trip.currency}
                 onCancel={() => setEditingStay(null)}
-                onSave={(values) => {
-                  onChange((t) => ({ ...t, stays: t.stays.map((x) => (x.id === s.id ? { ...x, ...values } : x)) }))
-                  setEditingStay(null)
-                }}
+                onSave={(values) => saveStay(s.id, values)}
               />
             ) : (
               <div className="item" key={s.id}>
                 <div>
                   <strong>{s.name}</strong>
                   {s.startDate !== s.endDate && (
-                    <small>{fmtDate(s.startDate)} – {fmtDate(s.endDate)}</small>
+                    <small>
+                      {fmtDate(s.startDate)} → {fmtDate(s.endDate)} · {nightsOf(s)} night{nightsOf(s) === 1 ? '' : 's'}
+                    </small>
                   )}
                   {date === s.startDate && s.checkInTime && <small>🔑 Check-in: {s.checkInTime}</small>}
-                  {date === s.endDate && s.checkOutTime && <small>🚪 Check-out: {s.checkOutTime}</small>}
                   {s.address && (
                     <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.address)}`} target="_blank" rel="noreferrer">
                       📍 {s.address}
@@ -123,7 +128,7 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
 
           {stays.length === 0 && !addingStay && (
             <div className="blank">
-              <span className="muted">No hotel yet</span>
+              <span className="muted">No hotel for tonight</span>
               <button onClick={() => setAddingStay(true)}>+ Add hotel</button>
             </div>
           )}
@@ -136,6 +141,34 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
         <ul className="list">
           {entries.map((entry) => {
             if (entry.kind === 'flight') return <FlightRow key={`f-${entry.flight.id}`} flight={entry.flight} date={date} />
+            if (entry.kind === 'checkout') {
+              const s = entry.stay
+              return editingStay === s.id ? (
+                <li key={`co-${s.id}`} className="editing">
+                  <StayForm
+                    initial={s}
+                    days={days}
+                    defaultDate={date}
+                    currency={trip.currency}
+                    onCancel={() => setEditingStay(null)}
+                    onSave={(values) => saveStay(s.id, values)}
+                  />
+                </li>
+              ) : (
+                <li key={`co-${s.id}`}>
+                  <div>
+                    <strong>
+                      <span className="emoji">🚪</span>
+                      {s.checkOutTime && <span className="time">{s.checkOutTime}</span>} Check out
+                    </strong>
+                    <small>{s.name}</small>
+                  </div>
+                  <div className="item-actions">
+                    <button className="link" onClick={() => setEditingStay(s.id)}>Edit</button>
+                  </div>
+                </li>
+              )
+            }
             const a = entry.activity
             return editingActivity === a.id ? (
               <li key={a.id} className="editing">
@@ -271,7 +304,8 @@ function StayForm({ initial, days, defaultDate, currency, onSave, onCancel }: St
   const [name, setName] = useState(initial?.name ?? '')
   const [address, setAddress] = useState(initial?.address ?? '')
   const [from, setFrom] = useState(initial?.startDate ?? defaultDate)
-  const [to, setTo] = useState(initial?.endDate ?? defaultDate)
+  // New stays default to one night: check out the day after checking in
+  const [to, setTo] = useState(initial?.endDate ?? days[days.indexOf(defaultDate) + 1] ?? defaultDate)
   const [checkInTime, setCheckInTime] = useState(initial?.checkInTime ?? '')
   const [checkOutTime, setCheckOutTime] = useState(initial?.checkOutTime ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
@@ -291,9 +325,12 @@ function StayForm({ initial, days, defaultDate, currency, onSave, onCancel }: St
   const effFrom = allDays ? days[0] : from
   const effTo = allDays ? days[days.length - 1] : to
 
+  // You check out after the night(s) you stay, so check-out days start the day after check-in
+  const checkOutOptions = [...new Set([...options.filter((d) => d > effFrom), effTo])].sort()
+
   const changeFrom = (d: string) => {
     setFrom(d)
-    if (to < d) setTo(d)
+    if (to <= d) setTo(options.find((o) => o > d) ?? d)
   }
 
   const submit = (e: React.FormEvent) => {
@@ -325,7 +362,7 @@ function StayForm({ initial, days, defaultDate, currency, onSave, onCancel }: St
 
       <div className="row">
         <label>
-          First day
+          Check-in day
           <select value={effFrom} disabled={allDays} onChange={(e) => changeFrom(e.target.value)}>
             {options.map((d) => (
               <option key={d} value={d}>{dayLabel(d)}</option>
@@ -333,9 +370,9 @@ function StayForm({ initial, days, defaultDate, currency, onSave, onCancel }: St
           </select>
         </label>
         <label>
-          Last day
+          Check-out day
           <select value={effTo} disabled={allDays} onChange={(e) => setTo(e.target.value)}>
-            {options.filter((d) => d >= effFrom).map((d) => (
+            {checkOutOptions.map((d) => (
               <option key={d} value={d}>{dayLabel(d)}</option>
             ))}
           </select>
