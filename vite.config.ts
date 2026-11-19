@@ -11,6 +11,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // The privacy page is plain HTML, so the service worker must not replace it with the app shell
+      workbox: { navigateFallbackDenylist: [/privacy\.html$/] },
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Travel Planner',
