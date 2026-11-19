@@ -121,6 +121,10 @@ a { color: var(--brand); }
 .balances li span { font-weight: 600; text-align: right; }
 .quick { display: flex; flex-direction: column; gap: .6rem; padding: .75rem; border-radius: .7rem; background: var(--bg); border: 1px solid var(--border); }
 .quick p { margin: 0; }
+.list li > .nets { text-align: right; align-items: flex-end; flex: 0 0 auto; }
+.nets span { font-weight: 600; }
+.list li.stack > .owe-row { flex-direction: row; justify-content: space-between; align-items: center; font-weight: 600; font-size: 1.05rem; }
+.list li.stack > strong { display: block; }
 .warn { color: #d97706; }
 .list li.stack { flex-direction: column; align-items: stretch; gap: .5rem; }
 .line-head { display: flex; justify-content: space-between; gap: .75rem; }

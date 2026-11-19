@@ -3,7 +3,8 @@ import { currenciesIn, type Line } from '../budget.ts'
 import { formatMoney } from '../money.ts'
 import { computeBalances, fromCents, isLineSplit, memberInUse, memberName, sharesFor, simplifyDebts, toCents } from '../splits.ts'
 import { uid } from '../storage.ts'
-import type { Member, Split as SplitInfo, Trip } from '../types.ts'
+import { EXPENSE_CATEGORIES, type Expense, type ExpenseCategory, type Member, type Split as SplitInfo, type Trip } from '../types.ts'
+import { CurrencySelect } from './CurrencySelect.tsx'
 
 type OnChange = (patch: (t: Trip) => Trip) => void
 
@@ -22,8 +23,6 @@ export function Split({ trip, lines, onChange }: Props) {
   const ids = new Set(members.map((m) => m.id))
   const name = (id: string) => memberName(members, id)
   const unsplit = lines.filter((l) => !isLineSplit(trip, l))
-  // Currencies are never mixed: each one gets its own balances and debts
-  const currencies = currenciesIn(trip, [...lines.map((l) => l.currency), ...trip.settlements.map((s) => s.currency)])
   const payer = ids.has(quickPayer) ? quickPayer : members[0]?.id
 
   const addMember = (e: React.FormEvent) => {
@@ -88,20 +87,14 @@ export function Split({ trip, lines, onChange }: Props) {
 
       {members.length >= 2 && (
         <>
-          {currencies.map((c) => (
-            <CurrencyBalances
-              key={c}
-              trip={trip}
-              lines={lines.filter((l) => l.currency === c)}
-              currency={c}
-              showCurrency={currencies.length > 1}
-              onChange={onChange}
-            />
-          ))}
+          <Settlements trip={trip} lines={lines} onChange={onChange} />
+
+          {/* Remounts when the group changes so new people are included by default */}
+          <AddExpense key={members.map((m) => m.id).join()} trip={trip} onChange={onChange} />
 
           <div className="panel">
             <h3 className="panel-title">Split your costs</h3>
-            {lines.length === 0 && <p className="muted">No costs yet. Add expenses in Summary, or costs to hotels, flights and activities.</p>}
+            {lines.length === 0 && <p className="muted">No costs yet. Add an expense above, or add costs to hotels, flights and activities.</p>}
 
             {unsplit.length > 0 && (
               <div className="quick">
@@ -167,71 +160,95 @@ export function Split({ trip, lines, onChange }: Props) {
   )
 }
 
-interface BalancesProps {
-  trip: Trip
-  lines: Line[]
-  currency: string
-  showCurrency: boolean
-  onChange: OnChange
-}
-
-function CurrencyBalances({ trip, lines, currency, showCurrency, onChange }: BalancesProps) {
+// Balances, debts and payments across every currency. Currencies are never converted, so
+// each person/pair lists one amount per currency.
+function Settlements({ trip, lines, onChange }: Props) {
   const { members } = trip
-  const money = (cents: number) => formatMoney(fromCents(cents), currency)
   const name = (id: string) => memberName(members, id)
-  const { paid, owed, net } = computeBalances(trip, lines, currency)
-  const transfers = simplifyDebts(net)
-  const settlements = trip.settlements.filter((s) => s.currency === currency)
+  const currencies = currenciesIn(trip, [...lines.map((l) => l.currency), ...trip.settlements.map((s) => s.currency)])
+  const multi = currencies.length > 1
   const anySplit = lines.some((l) => isLineSplit(trip, l))
-  const suffix = showCurrency ? ` · ${currency}` : ''
 
-  const settle = (from: string, to: string, cents: number) =>
+  const perCurrency = currencies.map((currency) => {
+    const balances = computeBalances(trip, lines.filter((l) => l.currency === currency), currency)
+    return { currency, ...balances, transfers: simplifyDebts(balances.net), money: (c: number) => formatMoney(fromCents(c), currency) }
+  })
+
+  // Group debts by pair of people so "A owes B" appears once with an amount per currency
+  const pairs = new Map<string, { from: string; to: string; items: { currency: string; amount: number; money: string }[] }>()
+  for (const pc of perCurrency) {
+    for (const t of pc.transfers) {
+      const key = `${t.from}>${t.to}`
+      const pair = pairs.get(key) ?? { from: t.from, to: t.to, items: [] }
+      pair.items.push({ currency: pc.currency, amount: t.amount, money: pc.money(t.amount) })
+      pairs.set(key, pair)
+    }
+  }
+
+  const settle = (from: string, to: string, cents: number, currency: string) =>
     onChange((t) => ({ ...t, settlements: [...t.settlements, { id: uid(), from, to, amount: fromCents(cents), currency }] }))
 
   const removeSettlement = (id: string) => onChange((t) => ({ ...t, settlements: t.settlements.filter((s) => s.id !== id) }))
 
+  if (currencies.length === 0) return null
+
   return (
     <>
       <div className="panel">
-        <h3 className="panel-title">Balances{suffix}</h3>
+        <h3 className="panel-title">Balances</h3>
         {!anySplit && <p className="muted">Split some costs below to see who owes what.</p>}
         <ul className="list balances">
-          {members.map((m) => (
-            <li key={m.id}>
-              <div>
-                <strong>{m.name}</strong>
-                <small>Paid {money(paid[m.id])} · Share {money(owed[m.id])}</small>
-              </div>
-              <span className={net[m.id] > 0 ? 'pos' : net[m.id] < 0 ? 'neg' : 'muted'}>
-                {net[m.id] > 0 ? `gets back ${money(net[m.id])}` : net[m.id] < 0 ? `owes ${money(-net[m.id])}` : 'settled up'}
-              </span>
-            </li>
-          ))}
+          {members.map((m) => {
+            const rows = perCurrency.filter((pc) => pc.paid[m.id] || pc.owed[m.id] || pc.net[m.id])
+            return (
+              <li key={m.id}>
+                <div>
+                  <strong>{m.name}</strong>
+                  {rows.map((pc) => (
+                    <small key={pc.currency}>Paid {pc.money(pc.paid[m.id])} · Share {pc.money(pc.owed[m.id])}</small>
+                  ))}
+                </div>
+                <div className="nets">
+                  {rows.length === 0 && <span className="muted">settled up</span>}
+                  {rows.map((pc) => {
+                    const n = pc.net[m.id]
+                    return (
+                      <span key={pc.currency} className={n > 0 ? 'pos' : n < 0 ? 'neg' : 'muted'}>
+                        {n > 0 ? `gets back ${pc.money(n)}` : n < 0 ? `owes ${pc.money(-n)}` : multi ? `${pc.currency} settled` : 'settled up'}
+                      </span>
+                    )
+                  })}
+                </div>
+              </li>
+            )
+          })}
         </ul>
       </div>
 
       <div className="panel">
-        <h3 className="panel-title">Who owes who{suffix}</h3>
-        {transfers.length === 0 ? (
+        <h3 className="panel-title">Who owes who</h3>
+        {pairs.size === 0 ? (
           <p className="muted">{anySplit ? 'Everyone is settled up 🎉' : 'Nothing to settle yet.'}</p>
         ) : (
           <ul className="list">
-            {transfers.map((t) => (
-              <li key={`${t.from}-${t.to}`}>
-                <div>
-                  <strong>{name(t.from)} owes {name(t.to)}</strong>
-                  <small>{money(t.amount)}</small>
-                </div>
-                <button onClick={() => settle(t.from, t.to, t.amount)}>Settle up</button>
+            {[...pairs.values()].map((p) => (
+              <li key={`${p.from}>${p.to}`} className="stack">
+                <strong>{name(p.from)} owes {name(p.to)}</strong>
+                {p.items.map((item) => (
+                  <div className="owe-row" key={item.currency}>
+                    <span>{item.money}</span>
+                    <button onClick={() => settle(p.from, p.to, item.amount, item.currency)}>Settle up</button>
+                  </div>
+                ))}
               </li>
             ))}
           </ul>
         )}
-        {settlements.length > 0 && (
+        {trip.settlements.length > 0 && (
           <>
             <h4 className="sub">Payments made</h4>
             <ul className="list">
-              {settlements.map((s) => (
+              {trip.settlements.map((s) => (
                 <li key={s.id}>
                   <div>
                     <strong>{name(s.from)} paid {name(s.to)}</strong>
@@ -248,49 +265,56 @@ function CurrencyBalances({ trip, lines, currency, showCurrency, onChange }: Bal
   )
 }
 
-interface EditorProps {
-  line: Line
-  members: Member[]
-  initial?: SplitInfo
-  onSave: (s: SplitInfo) => void
-  onClear?: () => void
-  onCancel: () => void
+// What the person editing a split has chosen so far. Custom amounts stay as text while typing.
+interface Draft {
+  paidBy: string
+  mode: 'equal' | 'custom'
+  among: string[]
+  amounts: Record<string, string>
 }
 
-function SplitEditor({ line, members, initial, onSave, onClear, onCancel }: EditorProps) {
-  const [paidBy, setPaidBy] = useState(initial?.paidBy ?? members[0].id)
-  const [mode, setMode] = useState<'equal' | 'custom'>(initial?.mode ?? 'equal')
-  const [among, setAmong] = useState<string[]>(initial?.among.length ? initial.among : members.map((m) => m.id))
-  const [amounts, setAmounts] = useState<Record<string, string>>(
-    Object.fromEntries(members.map((m) => [m.id, initial?.amounts[m.id] ? String(initial.amounts[m.id]) : ''])),
-  )
+const draftFrom = (members: Member[], initial?: SplitInfo): Draft => ({
+  paidBy: initial?.paidBy ?? members[0].id,
+  mode: initial?.mode ?? 'equal',
+  among: initial?.among.length ? initial.among : members.map((m) => m.id),
+  amounts: Object.fromEntries(members.map((m) => [m.id, initial?.amounts[m.id] ? String(initial.amounts[m.id]) : ''])),
+})
 
-  const customTotal = members.reduce((sum, m) => sum + toCents(Number(amounts[m.id]) || 0), 0)
-  const remaining = toCents(line.amount) - customTotal
-  const valid = mode === 'equal' ? among.length > 0 : customTotal > 0 && remaining === 0
+const customTotalCents = (draft: Draft, members: Member[]) =>
+  members.reduce((sum, m) => sum + toCents(Number(draft.amounts[m.id]) || 0), 0)
 
-  const toggle = (id: string) => setAmong((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]))
-
-  const save = () => {
-    if (!valid) return
-    onSave({
-      paidBy,
-      mode,
-      among: mode === 'equal' ? members.filter((m) => among.includes(m.id)).map((m) => m.id) : [],
-      amounts:
-        mode === 'custom'
-          ? Object.fromEntries(members.filter((m) => Number(amounts[m.id]) > 0).map((m) => [m.id, Number(amounts[m.id])]))
-          : {},
-    })
+// Returns null while the draft is incomplete or custom amounts don't add up to the cost
+function draftToSplit(draft: Draft, members: Member[], amount: number): SplitInfo | null {
+  const paidBy = members.some((m) => m.id === draft.paidBy) ? draft.paidBy : members[0].id
+  if (draft.mode === 'equal') {
+    const among = members.filter((m) => draft.among.includes(m.id)).map((m) => m.id)
+    return among.length > 0 ? { paidBy, mode: 'equal', among, amounts: {} } : null
   }
+  const total = customTotalCents(draft, members)
+  if (total <= 0 || total !== toCents(amount)) return null
+  const amounts = Object.fromEntries(members.filter((m) => Number(draft.amounts[m.id]) > 0).map((m) => [m.id, Number(draft.amounts[m.id])]))
+  return { paidBy, mode: 'custom', among: [], amounts }
+}
 
-  const money = (cents: number) => formatMoney(fromCents(cents), line.currency)
+interface FieldsProps {
+  members: Member[]
+  draft: Draft
+  onDraft: (d: Draft) => void
+  amount: number
+  currency: string
+}
+
+function SplitFields({ members, draft, onDraft, amount, currency }: FieldsProps) {
+  const set = (patch: Partial<Draft>) => onDraft({ ...draft, ...patch })
+  const remaining = toCents(amount) - customTotalCents(draft, members)
+  const money = (cents: number) => formatMoney(fromCents(cents), currency)
+  const toggle = (id: string) => set({ among: draft.among.includes(id) ? draft.among.filter((x) => x !== id) : [...draft.among, id] })
 
   return (
-    <div className="inline-form">
+    <>
       <label>
         Paid by
-        <select value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
+        <select value={draft.paidBy} onChange={(e) => set({ paidBy: e.target.value })}>
           {members.map((m) => (
             <option key={m.id} value={m.id}>{m.name}</option>
           ))}
@@ -298,23 +322,24 @@ function SplitEditor({ line, members, initial, onSave, onClear, onCancel }: Edit
       </label>
 
       <div className="tabs seg" role="tablist" aria-label="Split type">
-        <button type="button" role="tab" aria-selected={mode === 'equal'} className={mode === 'equal' ? 'active' : ''} onClick={() => setMode('equal')}>
-          Equally
+        <button type="button" role="tab" aria-selected={draft.mode === 'equal'} className={draft.mode === 'equal' ? 'active' : ''} onClick={() => set({ mode: 'equal' })}>
+          Split equally
         </button>
-        <button type="button" role="tab" aria-selected={mode === 'custom'} className={mode === 'custom' ? 'active' : ''} onClick={() => setMode('custom')}>
+        <button type="button" role="tab" aria-selected={draft.mode === 'custom'} className={draft.mode === 'custom' ? 'active' : ''} onClick={() => set({ mode: 'custom' })}>
           Custom amounts
         </button>
       </div>
 
-      {mode === 'equal' ? (
+      {draft.mode === 'equal' ? (
         <div className="member-checks">
+          <small className="muted">Split with</small>
           {members.map((m) => (
             <label key={m.id} className="check">
-              <input type="checkbox" checked={among.includes(m.id)} onChange={() => toggle(m.id)} />
+              <input type="checkbox" checked={draft.among.includes(m.id)} onChange={() => toggle(m.id)} />
               <span>{m.name}</span>
             </label>
           ))}
-          {among.length === 0 && <small className="warn">Pick at least one person.</small>}
+          {draft.among.length === 0 && <small className="warn">Pick at least one person.</small>}
         </div>
       ) : (
         <div className="custom-amounts">
@@ -326,9 +351,9 @@ function SplitEditor({ line, members, initial, onSave, onClear, onCancel }: Edit
                 min="0"
                 step="0.01"
                 inputMode="decimal"
-                value={amounts[m.id]}
+                value={draft.amounts[m.id]}
                 placeholder="0"
-                onChange={(e) => setAmounts((a) => ({ ...a, [m.id]: e.target.value }))}
+                onChange={(e) => set({ amounts: { ...draft.amounts, [m.id]: e.target.value } })}
               />
             </label>
           ))}
@@ -337,9 +362,83 @@ function SplitEditor({ line, members, initial, onSave, onClear, onCancel }: Edit
           </small>
         </div>
       )}
+    </>
+  )
+}
 
+interface AddProps {
+  trip: Trip
+  onChange: OnChange
+}
+
+function AddExpense({ trip, onChange }: AddProps) {
+  const { members } = trip
+  const [description, setDescription] = useState('')
+  const [category, setCategory] = useState<ExpenseCategory>('Food')
+  const [amount, setAmount] = useState('')
+  const [currency, setCurrency] = useState<string | null>(null)
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(members))
+
+  const value = Number(amount)
+  const split = value > 0 ? draftToSplit(draft, members, value) : null
+  const canAdd = !!description.trim() && value > 0 && !!split
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!canAdd || !split) return
+    const expense: Expense = { id: uid(), description: description.trim(), category, amount: value, currency: currency ?? trip.currency }
+    onChange((t) => ({ ...t, expenses: [...t.expenses, expense], splits: { ...t.splits, [expense.id]: split } }))
+    setDescription('')
+    setAmount('')
+    setDraft((d) => ({ ...d, amounts: Object.fromEntries(Object.keys(d.amounts).map((id) => [id, ''])) }))
+  }
+
+  return (
+    <form className="panel" onSubmit={submit}>
+      <h3 className="panel-title">Add an expense</h3>
+      <label>
+        Expense
+        <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ramen dinner" required />
+      </label>
+      <label>
+        Category
+        <select value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)}>
+          {EXPENSE_CATEGORIES.map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>
+      </label>
       <div className="row">
-        <button type="button" className="primary" disabled={!valid} onClick={save}>Save split</button>
+        <label>
+          Amount
+          <input type="number" min="0" step="0.01" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+        </label>
+        <CurrencySelect value={currency ?? trip.currency} onChange={setCurrency} />
+      </div>
+      <SplitFields members={members} draft={draft} onDraft={setDraft} amount={value || 0} currency={currency ?? trip.currency} />
+      <button type="submit" className="primary" disabled={!canAdd}>Add expense</button>
+    </form>
+  )
+}
+
+interface EditorProps {
+  line: Line
+  members: Member[]
+  initial?: SplitInfo
+  onSave: (s: SplitInfo) => void
+  onClear?: () => void
+  onCancel: () => void
+}
+
+function SplitEditor({ line, members, initial, onSave, onClear, onCancel }: EditorProps) {
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(members, initial))
+  const split = draftToSplit(draft, members, line.amount)
+
+  return (
+    <div className="inline-form">
+      <SplitFields members={members} draft={draft} onDraft={setDraft} amount={line.amount} currency={line.currency} />
+      <div className="row">
+        <button type="button" className="primary" disabled={!split} onClick={() => split && onSave(split)}>Save split</button>
         <button type="button" onClick={onCancel}>Cancel</button>
       </div>
       {onClear && <button type="button" className="danger" onClick={onClear}>Remove split</button>}
