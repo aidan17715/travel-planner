@@ -147,6 +147,9 @@ a { color: var(--brand); }
 
 .trip-head { gap: .5rem; flex-wrap: wrap; }
 
+.trip-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.trip-footer button { width: 100%; }
+
 .account { flex-direction: row; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .account > div:first-child { display: flex; flex-direction: column; gap: .2rem; flex: 1; min-width: 12rem; }
 .account-chip { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin: .25rem 0 .75rem; font-size: .85rem; color: var(--muted); }

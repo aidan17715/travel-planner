@@ -56,7 +56,6 @@ export function TripView({ trip, cloud, initialView, onChange, onDelete, onBack 
         <button onClick={onBack}>← Trips</button>
         <button className="primary" onClick={() => setShowOverview(true)}>🗺️ Overview</button>
         {cloud.configured && <button onClick={() => setShowShare(true)}>{trip.cloud ? '👥 Shared' : '👥 Share'}</button>}
-        <button className="danger" onClick={confirmDelete}>Delete</button>
       </div>
       {showOverview && <Overview trip={trip} onClose={() => setShowOverview(false)} />}
       {showShare && <ShareDialog trip={trip} cloud={cloud} onClose={() => setShowShare(false)} />}
@@ -98,6 +97,10 @@ export function TripView({ trip, cloud, initialView, onChange, onDelete, onBack 
       {tab === 'Itinerary' && <Itinerary trip={trip} onChange={onChange} />}
       {tab === 'Flights' && <Flights trip={trip} onChange={onChange} />}
       {tab === 'Expenses' && <Budget trip={trip} onChange={onChange} startInSplit={initialView?.split} />}
+
+      <div className="trip-footer">
+        <button className="danger delete-trip" onClick={confirmDelete}>Delete trip</button>
+      </div>
     </section>
   )
 }

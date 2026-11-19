@@ -16,7 +16,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     title: 'Welcome 👋',
     body:
-      "This example trip has everything filled in: flights, hotels, activities, expenses and a group split between three friends. Press Next to take a short tour. You can tap around freely, and delete the trip when you're done.",
+      "This example trip has everything filled in: flights, hotels, activities, expenses and a group split between three friends. Press Next to take a short tour. You can tap around freely, and delete the trip from the bottom of the page when you're done.",
     view: { tab: 'Itinerary' },
   },
   {
@@ -89,8 +89,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     title: "You're all set 🎉",
     body:
-      "Press Delete on this trip when you're done, then + New trip to start your own. You can reopen this guide any time from the Guide button on the main screen. Tip: install the app from your browser menu, and use Export to back up your trips.",
+      "Scroll to the bottom of the trip and press Delete trip when you're done, then + New trip to start your own. You can reopen this guide any time from the Guide button on the main screen. Tip: install the app from your browser menu, and use Export to back up your trips.",
     view: { tab: 'Itinerary' },
-    scrollTo: '.trip-head',
+    scrollTo: '.delete-trip',
   },
 ]
