@@ -180,6 +180,18 @@ create policy links_delete on public.trip_invite_links for delete to authenticat
 -- Nothing is readable or writable without signing in
 revoke all on public.trips, public.trip_members, public.trip_invite_links from anon;
 
+-- ---------------------------------------------------------------- privileges
+
+-- Newer Supabase projects don't automatically give signed-in users access to tables created in
+-- the SQL editor, so grant it explicitly. These only open the door to the table: the row level
+-- security policies above still decide which rows each person can read or change.
+grant usage on schema public to authenticated;
+grant select, insert, delete on public.trips to authenticated;
+grant update (data, rev) on public.trips to authenticated;
+grant select, delete on public.trip_members to authenticated;
+grant select, insert, delete on public.trip_invite_links to authenticated;
+grant execute on function public.is_trip_member(uuid), public.is_trip_owner(uuid) to authenticated;
+
 -- ---------------------------------------------------------------- realtime
 
 -- Lets other devices receive changes to shared trips as they happen
