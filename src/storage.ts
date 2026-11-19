@@ -64,6 +64,9 @@ const normalize = (t: Partial<Trip> & { hotels?: LegacyHotels }): Trip => {
       arriveTerminal: f.arriveTerminal.replace(/^t\s*(?=\d)/i, ''),
     })),
     expenses: t.expenses ?? [],
+    members: t.members ?? [],
+    splits: t.splits ?? {},
+    settlements: t.settlements ?? [],
   }
 }
 

@@ -1,20 +1,13 @@
 import { useState } from 'react'
+import { budgetLines } from '../budget.ts'
 import { formatMoney } from '../money.ts'
 import { uid } from '../storage.ts'
 import { EXPENSE_CATEGORIES, type Expense, type ExpenseCategory, type Trip } from '../types.ts'
+import { Split } from './Split.tsx'
 
 interface Props {
   trip: Trip
   onChange: (patch: (t: Trip) => Trip) => void
-}
-
-interface Line {
-  id: string
-  description: string
-  category: ExpenseCategory
-  amount: number
-  // Set for costs that come from the Itinerary or Flights tabs; those are edited there
-  source?: string
 }
 
 const COLORS: Record<ExpenseCategory, string> = {
@@ -83,27 +76,11 @@ export function Budget({ trip, onChange }: Props) {
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<ExpenseCategory>('Food')
   const [amount, setAmount] = useState('')
+  const [splitMode, setSplitMode] = useState(false)
 
   const money = (n: number) => formatMoney(n, trip.currency)
 
-  const lines: Line[] = [
-    ...trip.stays
-      .filter((s) => s.cost > 0)
-      .map((s) => ({ id: `stay-${s.id}`, description: s.name, category: 'Stay' as const, amount: s.cost, source: 'Hotel' })),
-    ...trip.flights
-      .filter((f) => f.cost > 0)
-      .map((f) => ({
-        id: `flight-${f.id}`,
-        description: [f.label, f.flightNumber].filter(Boolean).join(' · ') || 'Flight',
-        category: 'Flights' as const,
-        amount: f.cost,
-        source: 'Flights tab',
-      })),
-    ...trip.itinerary
-      .filter((a) => a.cost > 0)
-      .map((a) => ({ id: `activity-${a.id}`, description: a.title, category: 'Activities' as const, amount: a.cost, source: 'Itinerary' })),
-    ...trip.expenses,
-  ]
+  const lines = budgetLines(trip)
 
   const total = lines.reduce((s, e) => s + e.amount, 0)
   const remaining = trip.budget - total
@@ -123,10 +100,35 @@ export function Budget({ trip, onChange }: Props) {
     setAmount('')
   }
 
-  const remove = (id: string) => onChange((t) => ({ ...t, expenses: t.expenses.filter((x) => x.id !== id) }))
+  const remove = (id: string) =>
+    onChange((t) => {
+      const { [id]: _split, ...splits } = t.splits
+      return { ...t, expenses: t.expenses.filter((x) => x.id !== id), splits }
+    })
+
+  const modeToggle = (
+    <div className="tabs seg" role="tablist" aria-label="Budget mode">
+      <button role="tab" aria-selected={!splitMode} className={!splitMode ? 'active' : ''} onClick={() => setSplitMode(false)}>
+        Budget
+      </button>
+      <button role="tab" aria-selected={splitMode} className={splitMode ? 'active' : ''} onClick={() => setSplitMode(true)}>
+        Split mode
+      </button>
+    </div>
+  )
+
+  if (splitMode) {
+    return (
+      <div>
+        {modeToggle}
+        <Split trip={trip} lines={lines} onChange={onChange} />
+      </div>
+    )
+  }
 
   return (
     <div>
+      {modeToggle}
       <div className="panel summary">
         <div className="row">
           <label>

@@ -33,6 +33,9 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
       stays: [],
       flights: defaultFlights(startDate, endDate),
       expenses: [],
+      members: [],
+      splits: {},
+      settlements: [],
     }
     onAdd(trip)
     setAdding(false)

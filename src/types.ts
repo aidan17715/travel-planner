@@ -49,6 +49,27 @@ export interface Flight {
   cost: number
 }
 
+export interface Member {
+  id: string
+  name: string
+}
+
+// How one cost is shared. "equal" splits among `among`; "custom" uses the per-member `amounts`.
+export interface Split {
+  paidBy: string
+  mode: 'equal' | 'custom'
+  among: string[]
+  amounts: Record<string, number>
+}
+
+// A payment from one member to another that settles up part of a debt
+export interface Settlement {
+  id: string
+  from: string
+  to: string
+  amount: number
+}
+
 export interface Trip {
   id: string
   name: string
@@ -61,4 +82,8 @@ export interface Trip {
   stays: Stay[]
   flights: Flight[]
   expenses: Expense[]
+  members: Member[]
+  // Keyed by budget line id (see budget.ts)
+  splits: Record<string, Split>
+  settlements: Settlement[]
 }
