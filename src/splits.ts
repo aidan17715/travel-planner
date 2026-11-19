@@ -34,14 +34,19 @@ export interface Balances {
   paid: Record<string, number>
   owed: Record<string, number>
   net: Record<string, number>
-  unsplit: Line[]
 }
 
-export function computeBalances(trip: Trip, lines: Line[]): Balances {
+export function isLineSplit(trip: Trip, line: Line): boolean {
+  const split = trip.splits[line.id]
+  const ids = new Set(trip.members.map((m) => m.id))
+  return !!split && ids.has(split.paidBy) && Object.keys(sharesFor(line.amount, split, ids)).length > 0
+}
+
+// Balances for one currency: pass only that currency's lines. Currencies are never mixed or converted.
+export function computeBalances(trip: Trip, lines: Line[], currency: string): Balances {
   const ids = new Set(trip.members.map((m) => m.id))
   const paid: Record<string, number> = {}
   const owed: Record<string, number> = {}
-  const unsplit: Line[] = []
 
   for (const m of trip.members) {
     paid[m.id] = 0
@@ -50,11 +55,9 @@ export function computeBalances(trip: Trip, lines: Line[]): Balances {
 
   for (const line of lines) {
     const split = trip.splits[line.id]
-    const shares = split && ids.has(split.paidBy) ? sharesFor(line.amount, split, ids) : {}
-    if (Object.keys(shares).length === 0) {
-      unsplit.push(line)
-      continue
-    }
+    if (!split || !ids.has(split.paidBy)) continue
+    const shares = sharesFor(line.amount, split, ids)
+    if (Object.keys(shares).length === 0) continue
     paid[split.paidBy] += toCents(line.amount)
     for (const [id, c] of Object.entries(shares)) owed[id] += c
   }
@@ -63,13 +66,13 @@ export function computeBalances(trip: Trip, lines: Line[]): Balances {
   for (const m of trip.members) net[m.id] = paid[m.id] - owed[m.id]
   // A settlement moves money from the debtor to the creditor, so it reduces both balances
   for (const s of trip.settlements) {
-    if (s.from in net && s.to in net) {
+    if (s.currency === currency && s.from in net && s.to in net) {
       net[s.from] += toCents(s.amount)
       net[s.to] -= toCents(s.amount)
     }
   }
 
-  return { paid, owed, net, unsplit }
+  return { paid, owed, net }
 }
 
 export interface Transfer {

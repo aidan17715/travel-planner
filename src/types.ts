@@ -6,6 +6,7 @@ export interface ItineraryItem {
   location: string
   notes: string
   cost: number
+  currency: string
 }
 
 export const EXPENSE_CATEGORIES = ['Flights', 'Stay', 'Food', 'Transport', 'Activities', 'Shopping', 'Other'] as const
@@ -16,6 +17,7 @@ export interface Expense {
   description: string
   category: ExpenseCategory
   amount: number
+  currency: string
 }
 
 // A hotel booking covering every day from startDate to endDate (inclusive). cost 0 means "not set".
@@ -29,6 +31,7 @@ export interface Stay {
   checkInTime: string
   checkOutTime: string
   cost: number
+  currency: string
 }
 
 export interface Flight {
@@ -47,6 +50,7 @@ export interface Flight {
   arriveTerminal: string
   notes: string
   cost: number
+  currency: string
 }
 
 export interface Member {
@@ -62,12 +66,13 @@ export interface Split {
   amounts: Record<string, number>
 }
 
-// A payment from one member to another that settles up part of a debt
+// A payment from one member to another that settles up part of a debt in one currency
 export interface Settlement {
   id: string
   from: string
   to: string
   amount: number
+  currency: string
 }
 
 export interface Trip {
@@ -76,8 +81,8 @@ export interface Trip {
   destination: string
   startDate: string
   endDate: string
+  // Default currency pre-selected for new costs
   currency: string
-  budget: number
   itinerary: ItineraryItem[]
   stays: Stay[]
   flights: Flight[]

@@ -2,30 +2,41 @@ import { useState } from 'react'
 import { fmtDate } from '../dates.ts'
 import { newFlight } from '../storage.ts'
 import type { Flight, Trip } from '../types.ts'
+import { CurrencySelect } from './CurrencySelect.tsx'
 
 interface Props {
   trip: Trip
   onChange: (patch: (t: Trip) => Trip) => void
 }
 
-function CostField({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
-  const [text, setText] = useState(value ? String(value) : '')
+interface CostFieldProps {
+  cost: number
+  currency: string
+  onCost: (n: number) => void
+  onCurrency: (code: string) => void
+}
+
+function CostField({ cost, currency, onCost, onCurrency }: CostFieldProps) {
+  const [text, setText] = useState(cost ? String(cost) : '')
   return (
-    <label>
-      {label}
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        inputMode="decimal"
-        value={text}
-        placeholder="Added to your budget"
-        onChange={(e) => {
-          setText(e.target.value)
-          onChange(Number(e.target.value) > 0 ? Number(e.target.value) : 0)
-        }}
-      />
-    </label>
+    <div className="row">
+      <label>
+        Cost (optional)
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          value={text}
+          placeholder="Added to your expenses"
+          onChange={(e) => {
+            setText(e.target.value)
+            onCost(Number(e.target.value) > 0 ? Number(e.target.value) : 0)
+          }}
+        />
+      </label>
+      <CurrencySelect value={currency} onChange={onCurrency} />
+    </div>
   )
 }
 
@@ -47,7 +58,7 @@ export function Flights({ trip, onChange }: Props) {
   const flight = trip.flights.find((f) => f.id === selectedId) ?? trip.flights[0]
 
   const add = () => {
-    const f = newFlight(`Flight ${trip.flights.length + 1}`, trip.startDate)
+    const f = newFlight(`Flight ${trip.flights.length + 1}`, trip.startDate, trip.currency)
     onChange((t) => ({ ...t, flights: [...t.flights, f] }))
     setSelectedId(f.id)
   }
@@ -145,7 +156,13 @@ export function Flights({ trip, onChange }: Props) {
             Notes
             <input value={flight.notes} onChange={(e) => update({ notes: e.target.value })} placeholder="Seat, baggage, gate..." />
           </label>
-          <CostField key={flight.id} label={`Cost, ${trip.currency} (optional)`} value={flight.cost} onChange={(cost) => update({ cost })} />
+          <CostField
+            key={flight.id}
+            cost={flight.cost}
+            currency={flight.currency}
+            onCost={(cost) => update({ cost })}
+            onCurrency={(currency) => update({ currency })}
+          />
 
           <button className="danger" onClick={remove}>Delete this flight</button>
         </div>

@@ -76,7 +76,7 @@ export function Overview({ trip, onClose }: Props) {
                               {entry.activity.time && <span className="time">{entry.activity.time}</span>} {entry.activity.title}
                             </strong>
                             {entry.activity.location && <small>📍 {entry.activity.location}</small>}
-                            {entry.activity.cost > 0 && <small>💰 {formatMoney(entry.activity.cost, trip.currency)}</small>}
+                            {entry.activity.cost > 0 && <small>💰 {formatMoney(entry.activity.cost, entry.activity.currency)}</small>}
                           </div>
                         </li>
                       ),

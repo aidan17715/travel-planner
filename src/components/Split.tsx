@@ -1,14 +1,16 @@
 import { useState } from 'react'
-import type { Line } from '../budget.ts'
+import { currenciesIn, type Line } from '../budget.ts'
 import { formatMoney } from '../money.ts'
-import { computeBalances, fromCents, memberInUse, memberName, sharesFor, simplifyDebts, toCents } from '../splits.ts'
+import { computeBalances, fromCents, isLineSplit, memberInUse, memberName, sharesFor, simplifyDebts, toCents } from '../splits.ts'
 import { uid } from '../storage.ts'
 import type { Member, Split as SplitInfo, Trip } from '../types.ts'
+
+type OnChange = (patch: (t: Trip) => Trip) => void
 
 interface Props {
   trip: Trip
   lines: Line[]
-  onChange: (patch: (t: Trip) => Trip) => void
+  onChange: OnChange
 }
 
 export function Split({ trip, lines, onChange }: Props) {
@@ -16,12 +18,12 @@ export function Split({ trip, lines, onChange }: Props) {
   const [editing, setEditing] = useState<string | null>(null)
   const [quickPayer, setQuickPayer] = useState('')
 
-  const money = (cents: number) => formatMoney(fromCents(cents), trip.currency)
   const { members } = trip
   const ids = new Set(members.map((m) => m.id))
   const name = (id: string) => memberName(members, id)
-  const { paid, owed, net, unsplit } = computeBalances(trip, lines)
-  const transfers = simplifyDebts(net)
+  const unsplit = lines.filter((l) => !isLineSplit(trip, l))
+  // Currencies are never mixed: each one gets its own balances and debts
+  const currencies = currenciesIn(trip, [...lines.map((l) => l.currency), ...trip.settlements.map((s) => s.currency)])
   const payer = ids.has(quickPayer) ? quickPayer : members[0]?.id
 
   const addMember = (e: React.FormEvent) => {
@@ -63,13 +65,6 @@ export function Split({ trip, lines, onChange }: Props) {
       },
     }))
 
-  const settle = (from: string, to: string, cents: number) =>
-    onChange((t) => ({ ...t, settlements: [...t.settlements, { id: uid(), from, to, amount: fromCents(cents) }] }))
-
-  const removeSettlement = (id: string) => onChange((t) => ({ ...t, settlements: t.settlements.filter((s) => s.id !== id) }))
-
-  const anySplit = lines.length > unsplit.length
-
   return (
     <div>
       <div className="panel">
@@ -93,62 +88,20 @@ export function Split({ trip, lines, onChange }: Props) {
 
       {members.length >= 2 && (
         <>
-          <div className="panel">
-            <h3 className="panel-title">Balances</h3>
-            {!anySplit && <p className="muted">Split some costs below to see who owes what.</p>}
-            <ul className="list balances">
-              {members.map((m) => (
-                <li key={m.id}>
-                  <div>
-                    <strong>{m.name}</strong>
-                    <small>Paid {money(paid[m.id])} · Share {money(owed[m.id])}</small>
-                  </div>
-                  <span className={net[m.id] > 0 ? 'pos' : net[m.id] < 0 ? 'neg' : 'muted'}>
-                    {net[m.id] > 0 ? `gets back ${money(net[m.id])}` : net[m.id] < 0 ? `owes ${money(-net[m.id])}` : 'settled up'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="panel">
-            <h3 className="panel-title">Who owes who</h3>
-            {transfers.length === 0 ? (
-              <p className="muted">{anySplit ? 'Everyone is settled up 🎉' : 'Nothing to settle yet.'}</p>
-            ) : (
-              <ul className="list">
-                {transfers.map((t) => (
-                  <li key={`${t.from}-${t.to}`}>
-                    <div>
-                      <strong>{name(t.from)} owes {name(t.to)}</strong>
-                      <small>{money(t.amount)}</small>
-                    </div>
-                    <button onClick={() => settle(t.from, t.to, t.amount)}>Settle up</button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {trip.settlements.length > 0 && (
-              <>
-                <h4 className="sub">Payments made</h4>
-                <ul className="list">
-                  {trip.settlements.map((s) => (
-                    <li key={s.id}>
-                      <div>
-                        <strong>{name(s.from)} paid {name(s.to)}</strong>
-                        <small>{formatMoney(s.amount, trip.currency)}</small>
-                      </div>
-                      <button className="icon" aria-label="Undo payment" onClick={() => removeSettlement(s.id)}>✕</button>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
+          {currencies.map((c) => (
+            <CurrencyBalances
+              key={c}
+              trip={trip}
+              lines={lines.filter((l) => l.currency === c)}
+              currency={c}
+              showCurrency={currencies.length > 1}
+              onChange={onChange}
+            />
+          ))}
 
           <div className="panel">
             <h3 className="panel-title">Split your costs</h3>
-            {lines.length === 0 && <p className="muted">No costs yet. Add expenses in Budget mode, or costs to hotels, flights and activities.</p>}
+            {lines.length === 0 && <p className="muted">No costs yet. Add expenses in Summary, or costs to hotels, flights and activities.</p>}
 
             {unsplit.length > 0 && (
               <div className="quick">
@@ -170,8 +123,8 @@ export function Split({ trip, lines, onChange }: Props) {
             <ul className="list split-lines">
               {lines.map((line) => {
                 const split = trip.splits[line.id]
-                const shares = split && ids.has(split.paidBy) ? sharesFor(line.amount, split, ids) : {}
-                const isSplit = Object.keys(shares).length > 0
+                const isSplit = isLineSplit(trip, line)
+                const shares = isSplit ? sharesFor(line.amount, split, ids) : {}
                 return (
                   <li key={line.id} className="stack">
                     <div className="line-head">
@@ -179,14 +132,13 @@ export function Split({ trip, lines, onChange }: Props) {
                         <strong>{line.description}</strong>
                         <small>{line.source ? `${line.category} · from ${line.source}` : line.category}</small>
                       </div>
-                      <span>{formatMoney(line.amount, trip.currency)}</span>
+                      <span>{formatMoney(line.amount, line.currency)}</span>
                     </div>
                     {editing === line.id ? (
                       <SplitEditor
                         line={line}
                         members={members}
                         initial={isSplit ? split : undefined}
-                        currency={trip.currency}
                         onSave={(s) => saveSplit(line.id, s)}
                         onClear={isSplit ? () => saveSplit(line.id, null) : undefined}
                         onCancel={() => setEditing(null)}
@@ -196,7 +148,7 @@ export function Split({ trip, lines, onChange }: Props) {
                         {isSplit ? (
                           <small>
                             Paid by <strong>{name(split.paidBy)}</strong> · {split.mode === 'equal' ? 'split equally' : 'custom split'}:{' '}
-                            {Object.entries(shares).map(([id, c]) => `${name(id)} ${money(c)}`).join(', ')}
+                            {Object.entries(shares).map(([id, c]) => `${name(id)} ${formatMoney(fromCents(c), line.currency)}`).join(', ')}
                           </small>
                         ) : (
                           <small className="warn">Not split yet</small>
@@ -215,17 +167,97 @@ export function Split({ trip, lines, onChange }: Props) {
   )
 }
 
+interface BalancesProps {
+  trip: Trip
+  lines: Line[]
+  currency: string
+  showCurrency: boolean
+  onChange: OnChange
+}
+
+function CurrencyBalances({ trip, lines, currency, showCurrency, onChange }: BalancesProps) {
+  const { members } = trip
+  const money = (cents: number) => formatMoney(fromCents(cents), currency)
+  const name = (id: string) => memberName(members, id)
+  const { paid, owed, net } = computeBalances(trip, lines, currency)
+  const transfers = simplifyDebts(net)
+  const settlements = trip.settlements.filter((s) => s.currency === currency)
+  const anySplit = lines.some((l) => isLineSplit(trip, l))
+  const suffix = showCurrency ? ` · ${currency}` : ''
+
+  const settle = (from: string, to: string, cents: number) =>
+    onChange((t) => ({ ...t, settlements: [...t.settlements, { id: uid(), from, to, amount: fromCents(cents), currency }] }))
+
+  const removeSettlement = (id: string) => onChange((t) => ({ ...t, settlements: t.settlements.filter((s) => s.id !== id) }))
+
+  return (
+    <>
+      <div className="panel">
+        <h3 className="panel-title">Balances{suffix}</h3>
+        {!anySplit && <p className="muted">Split some costs below to see who owes what.</p>}
+        <ul className="list balances">
+          {members.map((m) => (
+            <li key={m.id}>
+              <div>
+                <strong>{m.name}</strong>
+                <small>Paid {money(paid[m.id])} · Share {money(owed[m.id])}</small>
+              </div>
+              <span className={net[m.id] > 0 ? 'pos' : net[m.id] < 0 ? 'neg' : 'muted'}>
+                {net[m.id] > 0 ? `gets back ${money(net[m.id])}` : net[m.id] < 0 ? `owes ${money(-net[m.id])}` : 'settled up'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="panel">
+        <h3 className="panel-title">Who owes who{suffix}</h3>
+        {transfers.length === 0 ? (
+          <p className="muted">{anySplit ? 'Everyone is settled up 🎉' : 'Nothing to settle yet.'}</p>
+        ) : (
+          <ul className="list">
+            {transfers.map((t) => (
+              <li key={`${t.from}-${t.to}`}>
+                <div>
+                  <strong>{name(t.from)} owes {name(t.to)}</strong>
+                  <small>{money(t.amount)}</small>
+                </div>
+                <button onClick={() => settle(t.from, t.to, t.amount)}>Settle up</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {settlements.length > 0 && (
+          <>
+            <h4 className="sub">Payments made</h4>
+            <ul className="list">
+              {settlements.map((s) => (
+                <li key={s.id}>
+                  <div>
+                    <strong>{name(s.from)} paid {name(s.to)}</strong>
+                    <small>{formatMoney(s.amount, s.currency)}</small>
+                  </div>
+                  <button className="icon" aria-label="Undo payment" onClick={() => removeSettlement(s.id)}>✕</button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+    </>
+  )
+}
+
 interface EditorProps {
   line: Line
   members: Member[]
   initial?: SplitInfo
-  currency: string
   onSave: (s: SplitInfo) => void
   onClear?: () => void
   onCancel: () => void
 }
 
-function SplitEditor({ line, members, initial, currency, onSave, onClear, onCancel }: EditorProps) {
+function SplitEditor({ line, members, initial, onSave, onClear, onCancel }: EditorProps) {
   const [paidBy, setPaidBy] = useState(initial?.paidBy ?? members[0].id)
   const [mode, setMode] = useState<'equal' | 'custom'>(initial?.mode ?? 'equal')
   const [among, setAmong] = useState<string[]>(initial?.among.length ? initial.among : members.map((m) => m.id))
@@ -252,7 +284,7 @@ function SplitEditor({ line, members, initial, currency, onSave, onClear, onCanc
     })
   }
 
-  const money = (cents: number) => formatMoney(fromCents(cents), currency)
+  const money = (cents: number) => formatMoney(fromCents(cents), line.currency)
 
   return (
     <div className="inline-form">

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { defaultFlights, uid } from '../storage.ts'
 import type { Trip } from '../types.ts'
+import { CurrencySelect } from './CurrencySelect.tsx'
 
 interface Props {
   trips: Trip[]
@@ -17,7 +18,6 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [currency, setCurrency] = useState('SGD')
-  const [budget, setBudget] = useState('')
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,11 +27,10 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
       destination: destination.trim(),
       startDate,
       endDate,
-      currency: currency.trim().toUpperCase() || 'SGD',
-      budget: Number(budget) || 0,
+      currency,
       itinerary: [],
       stays: [],
-      flights: defaultFlights(startDate, endDate),
+      flights: defaultFlights(startDate, endDate, currency),
       expenses: [],
       members: [],
       splits: {},
@@ -43,7 +42,6 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
     setDestination('')
     setStartDate('')
     setEndDate('')
-    setBudget('')
     onOpen(trip.id)
   }
 
@@ -89,16 +87,7 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
               <input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} required />
             </label>
           </div>
-          <div className="row">
-            <label>
-              Budget
-              <input type="number" min="0" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="0" />
-            </label>
-            <label>
-              Currency
-              <input value={currency} maxLength={3} onChange={(e) => setCurrency(e.target.value)} />
-            </label>
-          </div>
+          <CurrencySelect label="Default currency" value={currency} onChange={setCurrency} />
           <div className="row">
             <button type="submit" className="primary">Create trip</button>
             <button type="button" onClick={() => setAdding(false)}>Cancel</button>

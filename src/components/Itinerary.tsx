@@ -5,6 +5,7 @@ import { formatMoney } from '../money.ts'
 import { dayEntries, staysOn, tripDays } from '../schedule.ts'
 import { uid } from '../storage.ts'
 import type { ItineraryItem, Stay, Trip } from '../types.ts'
+import { CurrencySelect } from './CurrencySelect.tsx'
 import { FlightRow } from './FlightRow.tsx'
 
 type OnChange = (patch: (t: Trip) => Trip) => void
@@ -97,7 +98,7 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
                     </a>
                   )}
                   {s.notes && <small>{s.notes}</small>}
-                  {date === s.startDate && s.cost > 0 && <small>💰 {formatMoney(s.cost, trip.currency)}</small>}
+                  {date === s.startDate && s.cost > 0 && <small>💰 {formatMoney(s.cost, s.currency)}</small>}
                 </div>
                 <div className="item-actions">
                   <button className="link" onClick={() => setEditingStay(s.id)}>Edit</button>
@@ -161,7 +162,7 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
                     </a>
                   )}
                   {a.notes && <small>{a.notes}</small>}
-                  {a.cost > 0 && <small>💰 {formatMoney(a.cost, trip.currency)}</small>}
+                  {a.cost > 0 && <small>💰 {formatMoney(a.cost, a.currency)}</small>}
                 </div>
                 <div className="item-actions">
                   <button className="link" onClick={() => setEditingActivity(a.id)}>Edit</button>
@@ -189,10 +190,11 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
   )
 }
 
-type ActivityValues = Pick<ItineraryItem, 'time' | 'title' | 'location' | 'notes' | 'cost'>
+type ActivityValues = Pick<ItineraryItem, 'time' | 'title' | 'location' | 'notes' | 'cost' | 'currency'>
 
 interface ActivityFormProps {
   initial?: ItineraryItem
+  // The trip's default currency, used when the activity has none yet
   currency: string
   onSave: (v: ActivityValues) => void
   onCancel: () => void
@@ -204,11 +206,19 @@ function ActivityForm({ initial, currency, onSave, onCancel }: ActivityFormProps
   const [location, setLocation] = useState(initial?.location ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [cost, setCost] = useState(initial?.cost ? String(initial.cost) : '')
+  const [costCurrency, setCostCurrency] = useState(initial?.currency ?? currency)
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
-    onSave({ time, title: title.trim(), location: location.trim(), notes: notes.trim(), cost: Number(cost) > 0 ? Number(cost) : 0 })
+    onSave({
+      time,
+      title: title.trim(),
+      location: location.trim(),
+      notes: notes.trim(),
+      cost: Number(cost) > 0 ? Number(cost) : 0,
+      currency: costCurrency,
+    })
   }
 
   return (
@@ -231,10 +241,13 @@ function ActivityForm({ initial, currency, onSave, onCancel }: ActivityFormProps
         Notes
         <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Booking ref, tips..." />
       </label>
-      <label>
-        Cost, {currency}
-        <input type="number" min="0" step="0.01" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Added to your budget" />
-      </label>
+      <div className="row">
+        <label>
+          Cost
+          <input type="number" min="0" step="0.01" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Added to your expenses" />
+        </label>
+        <CurrencySelect value={costCurrency} onChange={setCostCurrency} />
+      </div>
       <div className="row">
         <button type="submit" className="primary">Save activity</button>
         <button type="button" onClick={onCancel}>Cancel</button>
@@ -263,6 +276,7 @@ function StayForm({ initial, days, defaultDate, currency, onSave, onCancel }: St
   const [checkOutTime, setCheckOutTime] = useState(initial?.checkOutTime ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [cost, setCost] = useState(initial?.cost ? String(initial.cost) : '')
+  const [costCurrency, setCostCurrency] = useState(initial?.currency ?? currency)
   const [allDays, setAllDays] = useState(
     !!initial && days.length > 1 && initial.startDate === days[0] && initial.endDate === days[days.length - 1],
   )
@@ -294,6 +308,7 @@ function StayForm({ initial, days, defaultDate, currency, onSave, onCancel }: St
       checkInTime,
       checkOutTime,
       cost: Number(cost) > 0 ? Number(cost) : 0,
+      currency: costCurrency,
     })
   }
 
@@ -347,10 +362,13 @@ function StayForm({ initial, days, defaultDate, currency, onSave, onCancel }: St
         Notes
         <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Booking ref..." />
       </label>
-      <label>
-        Total cost for the stay, {currency}
-        <input type="number" min="0" step="0.01" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Added to your budget" />
-      </label>
+      <div className="row">
+        <label>
+          Total cost for the stay
+          <input type="number" min="0" step="0.01" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Added to your expenses" />
+        </label>
+        <CurrencySelect value={costCurrency} onChange={setCostCurrency} />
+      </div>
 
       <div className="row">
         <button type="submit" className="primary">Save hotel</button>

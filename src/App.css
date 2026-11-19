@@ -111,6 +111,7 @@ a { color: var(--brand); }
 .prefixed input { border: none; background: transparent; padding-left: .2rem; outline: none; }
 
 .panel-title { margin: 0; font-size: 1rem; }
+.total-line { margin: 0; font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .seg { margin: 1rem 0 0; }
 .members li { display: inline-flex; align-items: center; gap: .1rem; padding: .15rem .2rem .15rem .7rem; font-size: .9rem; }

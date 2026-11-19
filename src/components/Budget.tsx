@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { budgetLines } from '../budget.ts'
+import { budgetLines, currenciesIn, sumLines } from '../budget.ts'
 import { formatMoney } from '../money.ts'
 import { uid } from '../storage.ts'
 import { EXPENSE_CATEGORIES, type Expense, type ExpenseCategory, type Trip } from '../types.ts'
+import { CurrencySelect } from './CurrencySelect.tsx'
 import { Split } from './Split.tsx'
 
 interface Props {
@@ -25,7 +26,15 @@ interface Slice {
   sum: number
 }
 
-function SpendingRing({ slices, total, money }: { slices: Slice[]; total: number; money: (n: number) => string }) {
+interface RingProps {
+  slices: Slice[]
+  total: number
+  currency: string
+  showCurrency: boolean
+}
+
+function SpendingRing({ slices, total, currency, showCurrency }: RingProps) {
+  const money = (n: number) => formatMoney(n, currency)
   const r = 60
   const circumference = 2 * Math.PI * r
   const arcs = slices.map((s, i) => ({
@@ -36,9 +45,9 @@ function SpendingRing({ slices, total, money }: { slices: Slice[]; total: number
 
   return (
     <div className="panel">
-      <h3 className="panel-title">Where your money goes</h3>
+      <h3 className="panel-title">Where your money goes{showCurrency ? ` · ${currency}` : ''}</h3>
       <div className="ring-wrap">
-        <svg viewBox="0 0 160 160" className="ring" role="img" aria-label="Spending breakdown ring chart">
+        <svg viewBox="0 0 160 160" className="ring" role="img" aria-label={`Spending breakdown ring chart in ${currency}`}>
           <circle cx="80" cy="80" r={r} fill="none" stroke="var(--border)" strokeWidth="22" />
           {arcs.map((a) => (
             <circle
@@ -76,25 +85,18 @@ export function Budget({ trip, onChange }: Props) {
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<ExpenseCategory>('Food')
   const [amount, setAmount] = useState('')
+  const [currency, setCurrency] = useState<string | null>(null)
   const [splitMode, setSplitMode] = useState(false)
 
-  const money = (n: number) => formatMoney(n, trip.currency)
-
   const lines = budgetLines(trip)
-
-  const total = lines.reduce((s, e) => s + e.amount, 0)
-  const remaining = trip.budget - total
-  const pct = trip.budget > 0 ? Math.min(100, (total / trip.budget) * 100) : 0
-  const byCategory = EXPENSE_CATEGORIES.map((c) => ({
-    c,
-    sum: lines.filter((e) => e.category === c).reduce((s, e) => s + e.amount, 0),
-  })).filter((x) => x.sum > 0)
+  const currencies = currenciesIn(trip, lines.map((l) => l.currency))
+  const multi = currencies.length > 1
 
   const add = (e: React.FormEvent) => {
     e.preventDefault()
     const value = Number(amount)
     if (!description.trim() || !(value > 0)) return
-    const expense: Expense = { id: uid(), description: description.trim(), category, amount: value }
+    const expense: Expense = { id: uid(), description: description.trim(), category, amount: value, currency: currency ?? trip.currency }
     onChange((t) => ({ ...t, expenses: [...t.expenses, expense] }))
     setDescription('')
     setAmount('')
@@ -107,9 +109,9 @@ export function Budget({ trip, onChange }: Props) {
     })
 
   const modeToggle = (
-    <div className="tabs seg" role="tablist" aria-label="Budget mode">
+    <div className="tabs seg" role="tablist" aria-label="View mode">
       <button role="tab" aria-selected={!splitMode} className={!splitMode ? 'active' : ''} onClick={() => setSplitMode(false)}>
-        Budget
+        Summary
       </button>
       <button role="tab" aria-selected={splitMode} className={splitMode ? 'active' : ''} onClick={() => setSplitMode(true)}>
         Split mode
@@ -130,46 +132,34 @@ export function Budget({ trip, onChange }: Props) {
     <div>
       {modeToggle}
       <div className="panel summary">
-        <div className="row">
-          <label>
-            Total budget
-            <input
-              type="number"
-              min="0"
-              inputMode="decimal"
-              value={trip.budget || ''}
-              placeholder="0"
-              onChange={(e) => onChange((t) => ({ ...t, budget: Number(e.target.value) || 0 }))}
-            />
-          </label>
-          <label className="narrow">
-            Currency
-            <input
-              value={trip.currency}
-              maxLength={3}
-              onChange={(e) => onChange((t) => ({ ...t, currency: e.target.value.toUpperCase() }))}
-            />
-          </label>
-        </div>
-        <div className="bar"><div className={remaining < 0 ? 'over' : ''} style={{ width: `${pct}%` }} /></div>
-        <p>
-          Spent <strong>{money(total)}</strong>
-          {trip.budget > 0 && (
-            <>
-              {' · '}
-              <span className={remaining < 0 ? 'neg' : 'pos'}>
-                {remaining < 0 ? `${money(-remaining)} over` : `${money(remaining)} left`}
-              </span>
-            </>
-          )}
-        </p>
-        {byCategory.length > 0 && (
-          <ul className="chips">
-            {byCategory.map(({ c, sum }) => (
-              <li key={c}>{c}: {money(sum)}</li>
-            ))}
-          </ul>
+        <h3 className="panel-title">Total spent</h3>
+        {currencies.length === 0 ? (
+          <p className="total-line">{formatMoney(0, trip.currency)}</p>
+        ) : (
+          currencies.map((c) => (
+            <p className="total-line" key={c}>
+              {formatMoney(sumLines(lines.filter((l) => l.currency === c)), c)}
+            </p>
+          ))
         )}
+        {currencies.map((c) => {
+          const chips = EXPENSE_CATEGORIES.map((cat) => ({
+            cat,
+            sum: sumLines(lines.filter((l) => l.currency === c && l.category === cat)),
+          })).filter((x) => x.sum > 0)
+          return (
+            <ul className="chips" key={c}>
+              {chips.map(({ cat, sum }) => (
+                <li key={cat}>{cat}: {formatMoney(sum, c)}</li>
+              ))}
+            </ul>
+          )
+        })}
+        <CurrencySelect
+          label="Default currency for new costs"
+          value={trip.currency}
+          onChange={(code) => onChange((t) => ({ ...t, currency: code }))}
+        />
       </div>
 
       <form className="panel" onSubmit={add}>
@@ -186,10 +176,13 @@ export function Budget({ trip, onChange }: Props) {
               ))}
             </select>
           </label>
+        </div>
+        <div className="row">
           <label>
             Amount
             <input type="number" min="0" step="0.01" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required />
           </label>
+          <CurrencySelect value={currency ?? trip.currency} onChange={setCurrency} />
         </div>
         <button type="submit" className="primary">Add expense</button>
       </form>
@@ -201,7 +194,7 @@ export function Budget({ trip, onChange }: Props) {
               <strong>{x.description}</strong>
               <small>{x.source ? `${x.category} · from ${x.source}` : x.category}</small>
             </div>
-            <span>{money(x.amount)}</span>
+            <span>{formatMoney(x.amount, x.currency)}</span>
             {x.source ? (
               <span className="icon-spacer" />
             ) : (
@@ -211,7 +204,11 @@ export function Budget({ trip, onChange }: Props) {
         ))}
       </ul>
 
-      {total > 0 && <SpendingRing slices={byCategory} total={total} money={money} />}
+      {currencies.map((c) => {
+        const inCurrency = lines.filter((l) => l.currency === c)
+        const slices = EXPENSE_CATEGORIES.map((cat) => ({ c: cat, sum: sumLines(inCurrency.filter((l) => l.category === cat)) })).filter((s) => s.sum > 0)
+        return <SpendingRing key={c} slices={slices} total={sumLines(inCurrency)} currency={c} showCurrency={multi} />
+      })}
     </div>
   )
 }

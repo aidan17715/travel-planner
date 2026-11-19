@@ -12,7 +12,7 @@ interface Props {
   onBack: () => void
 }
 
-const TABS = ['Itinerary', 'Flights', 'Budget'] as const
+const TABS = ['Itinerary', 'Flights', 'Expenses'] as const
 type Tab = (typeof TABS)[number]
 
 export function TripView({ trip, onChange, onDelete, onBack }: Props) {
@@ -77,7 +77,7 @@ export function TripView({ trip, onChange, onDelete, onBack }: Props) {
 
       {tab === 'Itinerary' && <Itinerary trip={trip} onChange={onChange} />}
       {tab === 'Flights' && <Flights trip={trip} onChange={onChange} />}
-      {tab === 'Budget' && <Budget trip={trip} onChange={onChange} />}
+      {tab === 'Expenses' && <Budget trip={trip} onChange={onChange} />}
     </section>
   )
 }
