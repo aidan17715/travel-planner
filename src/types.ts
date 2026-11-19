@@ -91,4 +91,6 @@ export interface Trip {
   // Keyed by budget line id (see budget.ts)
   splits: Record<string, Split>
   settlements: Settlement[]
+  // Splitwise-style "simplify debts": reroute debts through the group to need fewer payments
+  simplify: boolean
 }

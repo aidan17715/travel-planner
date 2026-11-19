@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { currenciesIn, type Line } from '../budget.ts'
 import { formatMoney } from '../money.ts'
-import { computeBalances, fromCents, isLineSplit, memberInUse, memberName, sharesFor, simplifyDebts, toCents } from '../splits.ts'
+import { computeBalances, fromCents, isLineSplit, memberInUse, memberName, pairwiseDebts, sharesFor, simplifyDebts, toCents } from '../splits.ts'
 import { uid } from '../storage.ts'
 import { EXPENSE_CATEGORIES, type Expense, type ExpenseCategory, type Member, type Split as SplitInfo, type Trip } from '../types.ts'
 import { CurrencySelect } from './CurrencySelect.tsx'
@@ -170,9 +170,22 @@ function Settlements({ trip, lines, onChange }: Props) {
   const anySplit = lines.some((l) => isLineSplit(trip, l))
 
   const perCurrency = currencies.map((currency) => {
-    const balances = computeBalances(trip, lines.filter((l) => l.currency === currency), currency)
-    return { currency, ...balances, transfers: simplifyDebts(balances.net), money: (c: number) => formatMoney(fromCents(c), currency) }
+    const cl = lines.filter((l) => l.currency === currency)
+    const balances = computeBalances(trip, cl, currency)
+    const simplified = simplifyDebts(balances.net)
+    const direct = pairwiseDebts(trip, cl, currency)
+    return {
+      currency,
+      ...balances,
+      transfers: trip.simplify ? simplified : direct,
+      simplifiedCount: simplified.length,
+      directCount: direct.length,
+      money: (c: number) => formatMoney(fromCents(c), currency),
+    }
   })
+  const directTotal = perCurrency.reduce((n, pc) => n + pc.directCount, 0)
+  const simplifiedTotal = perCurrency.reduce((n, pc) => n + pc.simplifiedCount, 0)
+  const saved = directTotal - simplifiedTotal
 
   // Group debts by pair of people so "A owes B" appears once with an amount per currency
   const pairs = new Map<string, { from: string; to: string; items: { currency: string; amount: number; money: string }[] }>()
@@ -226,7 +239,30 @@ function Settlements({ trip, lines, onChange }: Props) {
       </div>
 
       <div className="panel">
-        <h3 className="panel-title">Who owes who</h3>
+        <div className="panel-head">
+          <h3 className="panel-title">Who owes who</h3>
+          <label className="switch">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={trip.simplify}
+              onChange={(e) => onChange((t) => ({ ...t, simplify: e.target.checked }))}
+            />
+            <span className="slider" aria-hidden="true" />
+            <span>Simplify debts</span>
+          </label>
+        </div>
+        {!(trip.simplify && simplifiedTotal === 0) && (
+          <small className="muted">
+            {trip.simplify
+              ? saved > 0
+                ? `Simplified: ${simplifiedTotal} payment${simplifiedTotal === 1 ? '' : 's'} instead of ${directTotal}.`
+                : 'Simplified: these are already the fewest payments.'
+              : saved > 0
+                ? `Turn on to reduce from ${directTotal} to ${simplifiedTotal} payment${simplifiedTotal === 1 ? '' : 's'} by rerouting debts through the group.`
+                : 'Showing who owes whom directly. Turn on to reroute debts for fewer payments.'}
+          </small>
+        )}
         {pairs.size === 0 ? (
           <p className="muted">{anySplit ? 'Everyone is settled up 🎉' : 'Nothing to settle yet.'}</p>
         ) : (

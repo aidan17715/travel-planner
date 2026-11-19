@@ -100,6 +100,39 @@ export function simplifyDebts(net: Record<string, number>): Transfer[] {
   return transfers
 }
 
+// Debts with "simplify" off: each person owes the payer of each cost directly. Opposite debts
+// between the same two people cancel out, but nothing is rerouted through third parties.
+export function pairwiseDebts(trip: Trip, lines: Line[], currency: string): Transfer[] {
+  const ids = new Set(trip.members.map((m) => m.id))
+  const debt = new Map<string, number>()
+  const add = (from: string, to: string, cents: number) => debt.set(`${from}>${to}`, (debt.get(`${from}>${to}`) ?? 0) + cents)
+
+  for (const line of lines) {
+    const split = trip.splits[line.id]
+    if (!split || !ids.has(split.paidBy)) continue
+    for (const [id, cents] of Object.entries(sharesFor(line.amount, split, ids))) {
+      if (id !== split.paidBy) add(id, split.paidBy, cents)
+    }
+  }
+  // A payment from X to Y reduces what X owes Y
+  for (const s of trip.settlements) {
+    if (s.currency === currency && ids.has(s.from) && ids.has(s.to)) add(s.from, s.to, -toCents(s.amount))
+  }
+
+  const transfers: Transfer[] = []
+  const seen = new Set<string>()
+  for (const key of debt.keys()) {
+    const [a, b] = key.split('>')
+    const pair = [a, b].sort().join('>')
+    if (seen.has(pair)) continue
+    seen.add(pair)
+    const owed = (debt.get(`${a}>${b}`) ?? 0) - (debt.get(`${b}>${a}`) ?? 0)
+    if (owed > 0) transfers.push({ from: a, to: b, amount: owed })
+    else if (owed < 0) transfers.push({ from: b, to: a, amount: -owed })
+  }
+  return transfers
+}
+
 // True if the member appears in any split or settlement, so removing them would corrupt balances
 export function memberInUse(trip: Trip, id: string): boolean {
   const inSplit = Object.values(trip.splits).some(

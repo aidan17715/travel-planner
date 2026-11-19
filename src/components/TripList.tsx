@@ -35,6 +35,7 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
       members: [],
       splits: {},
       settlements: [],
+      simplify: false,
     }
     onAdd(trip)
     setAdding(false)

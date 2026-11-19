@@ -73,6 +73,7 @@ const normalize = (t: Partial<Trip> & { hotels?: LegacyHotels }): Trip => {
     members: t.members ?? [],
     splits: t.splits ?? {},
     settlements: (t.settlements ?? []).map((s) => ({ ...s, currency: s.currency ?? currency })),
+    simplify: t.simplify ?? false,
   }
 }
 
