@@ -29,7 +29,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     title: "A day's schedule",
     body:
-      "Day 2 has a few activities. Each one gets an emoji picked from its name (🛕 temple, 🍣 sushi, 🏛️ museum), plus a time, a map link, notes and a cost. Tap Edit to change one, ✕ to delete it, or + Add activity to add your own. Costs go into Expenses automatically.",
+      "Day 2 has a few activities, each with a time, a map link, notes and a cost. Tap Edit to change one, ✕ to delete it, or + Add activity to add your own. Costs go into Expenses automatically.",
     view: { tab: 'Itinerary' },
     scrollTo: '.days > .day-card:nth-child(2)',
   },
