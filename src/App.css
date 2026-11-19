@@ -88,6 +88,7 @@ a { color: var(--brand); }
 .item { display: flex; justify-content: space-between; gap: .75rem; align-items: flex-start; background: var(--bg); border: 1px solid var(--border); border-radius: .7rem; padding: .7rem .9rem; }
 .item > div:first-child, .list li > div:first-child { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
 .item-actions { display: flex; align-items: center; gap: .25rem; }
+.list li > .item-actions { flex: 0 0 auto; flex-direction: row; }
 .blank { display: flex; justify-content: space-between; align-items: center; gap: .5rem; border: 1px dashed var(--border); border-radius: .7rem; padding: .5rem .75rem; }
 .blank-text { margin: 0 0 .5rem; }
 .add-btn { width: 100%; margin-top: .5rem; border-style: dashed; color: var(--brand); }
@@ -110,6 +111,26 @@ a { color: var(--brand); }
 .prefixed input { border: none; background: transparent; padding-left: .2rem; outline: none; }
 
 .panel-title { margin: 0; font-size: 1rem; }
+
+.trip-head { gap: .5rem; }
+
+.overlay {
+  position: fixed; inset: 0; z-index: 50; overflow-y: auto; background: var(--bg);
+  padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1.5rem + env(safe-area-inset-bottom));
+}
+.overlay-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+.overlay-head h2 { margin: 0; }
+.overlay-head p { margin: .2rem 0 0; }
+.overview-scroll { overflow-x: auto; padding-bottom: 1rem; }
+.overview-grid { display: flex; gap: .75rem; align-items: flex-start; width: max-content; min-width: 100%; }
+.ov-day { flex: 0 0 15.5rem; background: var(--card); border: 1px solid var(--border); border-radius: .9rem; padding: .85rem; display: flex; flex-direction: column; gap: .6rem; }
+.ov-day h3 { margin: 0; display: flex; justify-content: space-between; align-items: baseline; font-size: 1rem; }
+.ov-day h3 small { font-weight: 400; }
+.ov-day p { margin: 0; }
+.ov-day .list li { background: var(--bg); }
+.ov-day .big-time { font-size: 1.15rem; }
+.ov-day .leg-verb { width: 3.6rem; }
+.ov-hotel { display: flex; flex-direction: column; gap: .1rem; padding: .5rem .65rem; border-radius: .6rem; background: var(--bg); border: 1px solid var(--border); }
 .ring-wrap { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; justify-content: center; }
 .ring { width: 11rem; height: 11rem; flex: 0 0 auto; }
 .ring-total { font-size: 15px; font-weight: 700; fill: var(--text); }

@@ -3,6 +3,7 @@ import type { Trip } from '../types.ts'
 import { Budget } from './Budget.tsx'
 import { Flights } from './Flights.tsx'
 import { Itinerary } from './Itinerary.tsx'
+import { Overview } from './Overview.tsx'
 
 interface Props {
   trip: Trip
@@ -16,6 +17,7 @@ type Tab = (typeof TABS)[number]
 
 export function TripView({ trip, onChange, onDelete, onBack }: Props) {
   const [tab, setTab] = useState<Tab>('Itinerary')
+  const [showOverview, setShowOverview] = useState(false)
 
   const confirmDelete = () => {
     if (confirm(`Delete "${trip.name}"? This cannot be undone.`)) onDelete()
@@ -37,8 +39,10 @@ export function TripView({ trip, onChange, onDelete, onBack }: Props) {
     <section>
       <div className="trip-head">
         <button onClick={onBack}>← Trips</button>
+        <button className="primary" onClick={() => setShowOverview(true)}>🗺️ Overview</button>
         <button className="danger" onClick={confirmDelete}>Delete</button>
       </div>
+      {showOverview && <Overview trip={trip} onClose={() => setShowOverview(false)} />}
       <h2>{trip.name}</h2>
       <p className="muted">{trip.destination}</p>
 

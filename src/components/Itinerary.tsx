@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { fmtDate, listDays } from '../dates.ts'
 import { activityEmoji } from '../emoji.ts'
 import { formatMoney } from '../money.ts'
+import { dayEntries, staysOn, tripDays } from '../schedule.ts'
 import { uid } from '../storage.ts'
-import type { Flight, ItineraryItem, Stay, Trip } from '../types.ts'
+import type { ItineraryItem, Stay, Trip } from '../types.ts'
+import { FlightRow } from './FlightRow.tsx'
 
 type OnChange = (patch: (t: Trip) => Trip) => void
 
@@ -13,19 +15,7 @@ interface Props {
 }
 
 export function Itinerary({ trip, onChange }: Props) {
-  const days = listDays(trip.startDate, trip.endDate)
-  const inRange = new Set(days)
-
-  // Anything dated outside the trip range stays visible so nothing is lost
-  const strayDates = [
-    ...new Set([
-      ...trip.itinerary.map((i) => i.date),
-      ...trip.stays.flatMap((s) => [s.startDate, s.endDate]).filter(Boolean),
-      ...trip.flights.flatMap((f) => [f.departDate, f.arriveDate]).filter(Boolean),
-    ]),
-  ]
-    .filter((d) => !inRange.has(d))
-    .sort()
+  const { days, strayDates } = tripDays(trip)
 
   if (days.length === 0 && strayDates.length === 0) {
     return <p className="muted">Set the trip's start and end dates above to see each day of your trip.</p>
@@ -57,16 +47,8 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
   const [addingStay, setAddingStay] = useState(false)
   const [editingStay, setEditingStay] = useState<string | null>(null)
 
-  const stays = date ? trip.stays.filter((s) => s.startDate <= date && date <= s.endDate) : []
-  const flights = date ? trip.flights.filter((f) => f.departDate === date || f.arriveDate === date) : []
-
-  // Flights and activities share one timeline; untimed entries go last (flights win ties)
-  const entries: Entry[] = [
-    ...flights.map((flight): Entry => ({ kind: 'flight', time: flightTime(flight, date), flight })),
-    ...trip.itinerary
-      .filter((i) => i.date === date)
-      .map((activity): Entry => ({ kind: 'activity', time: sortTime(activity.time), activity })),
-  ].sort((a, b) => a.time.localeCompare(b.time))
+  const stays = staysOn(trip, date)
+  const entries = dayEntries(trip, date)
 
   const removeActivity = (id: string) => onChange((t) => ({ ...t, itinerary: t.itinerary.filter((i) => i.id !== id) }))
 
@@ -208,43 +190,6 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
 }
 
 type ActivityValues = Pick<ItineraryItem, 'time' | 'title' | 'location' | 'notes' | 'cost'>
-
-type Entry =
-  | { kind: 'flight'; time: string; flight: Flight }
-  | { kind: 'activity'; time: string; activity: ItineraryItem }
-
-const sortTime = (t: string) => t || '99:99'
-
-const flightTime = (f: Flight, date: string) => sortTime(f.departDate === date ? f.departTime : f.arriveTime)
-
-const place = (airport: string, terminal: string) => [airport, terminal && `(T${terminal})`].filter(Boolean).join(' ')
-
-function FlightRow({ flight: f, date }: { flight: Flight; date: string }) {
-  const legs = [
-    f.departDate === date && { verb: 'Departs', time: f.departTime, where: place(f.departAirport, f.departTerminal) },
-    f.arriveDate === date && { verb: 'Arrives', time: f.arriveTime, where: place(f.arriveAirport, f.arriveTerminal) },
-  ].filter((l) => !!l)
-  const extra = [f.airline, f.bookingRef && `Ref ${f.bookingRef}`].filter(Boolean).join(' · ')
-
-  return (
-    <li className="flight">
-      <div>
-        <strong>
-          <span className="emoji">✈️</span>
-          {[f.label, f.flightNumber].filter(Boolean).join(' · ') || 'Flight'}
-        </strong>
-        {legs.map((l) => (
-          <div className="leg" key={l.verb}>
-            <span className="leg-verb">{l.verb}</span>
-            {l.time && <span className="big-time">{l.time}</span>}
-            {l.where && <span>{l.where}</span>}
-          </div>
-        ))}
-        {extra && <small>{extra}</small>}
-      </div>
-    </li>
-  )
-}
 
 interface ActivityFormProps {
   initial?: ItineraryItem
