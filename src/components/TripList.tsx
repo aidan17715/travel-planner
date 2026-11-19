@@ -16,7 +16,7 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
   const [destination, setDestination] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [currency, setCurrency] = useState('USD')
+  const [currency, setCurrency] = useState('SGD')
   const [budget, setBudget] = useState('')
 
   const submit = (e: React.FormEvent) => {
@@ -27,7 +27,7 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
       destination: destination.trim(),
       startDate,
       endDate,
-      currency: currency.trim().toUpperCase() || 'USD',
+      currency: currency.trim().toUpperCase() || 'SGD',
       budget: Number(budget) || 0,
       itinerary: [],
       stays: [],

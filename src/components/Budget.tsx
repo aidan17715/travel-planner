@@ -17,6 +17,68 @@ interface Line {
   source?: string
 }
 
+const COLORS: Record<ExpenseCategory, string> = {
+  Flights: '#0ea5e9',
+  Stay: '#8b5cf6',
+  Food: '#f59e0b',
+  Transport: '#10b981',
+  Activities: '#ef4444',
+  Shopping: '#ec4899',
+  Other: '#64748b',
+}
+
+interface Slice {
+  c: ExpenseCategory
+  sum: number
+}
+
+function SpendingRing({ slices, total, money }: { slices: Slice[]; total: number; money: (n: number) => string }) {
+  const r = 60
+  const circumference = 2 * Math.PI * r
+  const arcs = slices.map((s, i) => ({
+    ...s,
+    length: (s.sum / total) * circumference,
+    start: slices.slice(0, i).reduce((acc, x) => acc + (x.sum / total) * circumference, 0),
+  }))
+
+  return (
+    <div className="panel">
+      <h3 className="panel-title">Where your money goes</h3>
+      <div className="ring-wrap">
+        <svg viewBox="0 0 160 160" className="ring" role="img" aria-label="Spending breakdown ring chart">
+          <circle cx="80" cy="80" r={r} fill="none" stroke="var(--border)" strokeWidth="22" />
+          {arcs.map((a) => (
+            <circle
+              key={a.c}
+              cx="80"
+              cy="80"
+              r={r}
+              fill="none"
+              stroke={COLORS[a.c]}
+              strokeWidth="22"
+              strokeDasharray={`${a.length} ${circumference - a.length}`}
+              strokeDashoffset={-a.start}
+              transform="rotate(-90 80 80)"
+            />
+          ))}
+          <text x="80" y="78" textAnchor="middle" className="ring-total">{money(total)}</text>
+          <text x="80" y="95" textAnchor="middle" className="ring-label">spent</text>
+        </svg>
+        <ul className="legend">
+          {slices.map((s) => (
+            <li key={s.c}>
+              <span className="dot" style={{ background: COLORS[s.c] }} />
+              <span className="legend-name">{s.c}</span>
+              <span className="legend-amount">{money(s.sum)}</span>
+              <small>{Math.round((s.sum / total) * 100)}%</small>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
 export function Budget({ trip, onChange }: Props) {
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<ExpenseCategory>('Food')
@@ -66,17 +128,27 @@ export function Budget({ trip, onChange }: Props) {
   return (
     <div>
       <div className="panel summary">
-        <label>
-          Total budget ({trip.currency})
-          <input
-            type="number"
-            min="0"
-            inputMode="decimal"
-            value={trip.budget || ''}
-            placeholder="0"
-            onChange={(e) => onChange((t) => ({ ...t, budget: Number(e.target.value) || 0 }))}
-          />
-        </label>
+        <div className="row">
+          <label>
+            Total budget
+            <input
+              type="number"
+              min="0"
+              inputMode="decimal"
+              value={trip.budget || ''}
+              placeholder="0"
+              onChange={(e) => onChange((t) => ({ ...t, budget: Number(e.target.value) || 0 }))}
+            />
+          </label>
+          <label className="narrow">
+            Currency
+            <input
+              value={trip.currency}
+              maxLength={3}
+              onChange={(e) => onChange((t) => ({ ...t, currency: e.target.value.toUpperCase() }))}
+            />
+          </label>
+        </div>
         <div className="bar"><div className={remaining < 0 ? 'over' : ''} style={{ width: `${pct}%` }} /></div>
         <p>
           Spent <strong>{money(total)}</strong>
@@ -136,6 +208,8 @@ export function Budget({ trip, onChange }: Props) {
           </li>
         ))}
       </ul>
+
+      {total > 0 && <SpendingRing slices={byCategory} total={total} money={money} />}
     </div>
   )
 }

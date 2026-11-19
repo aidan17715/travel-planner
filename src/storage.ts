@@ -53,11 +53,16 @@ const normalize = (t: Partial<Trip> & { hotels?: LegacyHotels }): Trip => {
     destination: t.destination ?? '',
     startDate,
     endDate,
-    currency: t.currency ?? 'USD',
+    currency: t.currency ?? 'SGD',
     budget: Number(t.budget) || 0,
     itinerary: (t.itinerary ?? []).map((i) => ({ ...i, cost: Number(i.cost) || 0 })),
     stays: t.stays ?? (t.hotels ? staysFromLegacy(t.hotels) : []),
-    flights: t.flights ?? defaultFlights(startDate, endDate),
+    // The terminal "T" is now a fixed prefix in the UI, so older values like "T3" are stored as "3"
+    flights: (t.flights ?? defaultFlights(startDate, endDate)).map((f) => ({
+      ...f,
+      departTerminal: f.departTerminal.replace(/^t\s*(?=\d)/i, ''),
+      arriveTerminal: f.arriveTerminal.replace(/^t\s*(?=\d)/i, ''),
+    })),
     expenses: t.expenses ?? [],
   }
 }

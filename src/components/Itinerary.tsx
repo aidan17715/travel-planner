@@ -58,14 +58,15 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
   const [editingStay, setEditingStay] = useState<string | null>(null)
 
   const stays = date ? trip.stays.filter((s) => s.startDate <= date && date <= s.endDate) : []
-  const flights = date
-    ? trip.flights
-        .filter((f) => f.departDate === date || f.arriveDate === date)
-        .sort((a, b) => flightTime(a, date).localeCompare(flightTime(b, date)))
-    : []
-  const activities = trip.itinerary
-    .filter((i) => i.date === date)
-    .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
+  const flights = date ? trip.flights.filter((f) => f.departDate === date || f.arriveDate === date) : []
+
+  // Flights and activities share one timeline; untimed entries go last (flights win ties)
+  const entries: Entry[] = [
+    ...flights.map((flight): Entry => ({ kind: 'flight', time: flightTime(flight, date), flight })),
+    ...trip.itinerary
+      .filter((i) => i.date === date)
+      .map((activity): Entry => ({ kind: 'activity', time: sortTime(activity.time), activity })),
+  ].sort((a, b) => a.time.localeCompare(b.time))
 
   const removeActivity = (id: string) => onChange((t) => ({ ...t, itinerary: t.itinerary.filter((i) => i.id !== id) }))
 
@@ -81,15 +82,6 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
         <span>{label}</span>
         <span className="day-date">{fmtDate(date)}</span>
       </h3>
-
-      {flights.length > 0 && (
-        <section>
-          <h4>✈️ Flights</h4>
-          {flights.map((f) => (
-            <FlightRow key={f.id} flight={f} date={date} />
-          ))}
-        </section>
-      )}
 
       {date && (
         <section>
@@ -156,11 +148,13 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
       )}
 
       <section>
-        <h4>📅 Activities</h4>
-        {activities.length === 0 && !addingActivity && <p className="muted blank-text">No activities yet</p>}
+        <h4>📅 Schedule</h4>
+        {entries.length === 0 && !addingActivity && <p className="muted blank-text">No activities yet</p>}
         <ul className="list">
-          {activities.map((a) =>
-            editingActivity === a.id ? (
+          {entries.map((entry) => {
+            if (entry.kind === 'flight') return <FlightRow key={`f-${entry.flight.id}`} flight={entry.flight} date={date} />
+            const a = entry.activity
+            return editingActivity === a.id ? (
               <li key={a.id} className="editing">
                 <ActivityForm
                   initial={a}
@@ -192,8 +186,8 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
                   <button className="icon" aria-label={`Delete ${a.title}`} onClick={() => removeActivity(a.id)}>✕</button>
                 </div>
               </li>
-            ),
-          )}
+            )
+          })}
         </ul>
 
         {addingActivity ? (
@@ -215,33 +209,40 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
 
 type ActivityValues = Pick<ItineraryItem, 'time' | 'title' | 'location' | 'notes' | 'cost'>
 
+type Entry =
+  | { kind: 'flight'; time: string; flight: Flight }
+  | { kind: 'activity'; time: string; activity: ItineraryItem }
+
 const sortTime = (t: string) => t || '99:99'
 
 const flightTime = (f: Flight, date: string) => sortTime(f.departDate === date ? f.departTime : f.arriveTime)
 
-const place = (airport: string, terminal: string) => [airport, terminal && `(${terminal})`].filter(Boolean).join(' ')
+const place = (airport: string, terminal: string) => [airport, terminal && `(T${terminal})`].filter(Boolean).join(' ')
 
 function FlightRow({ flight: f, date }: { flight: Flight; date: string }) {
-  const departs = f.departDate === date
-  const arrives = f.arriveDate === date
-  const lines = [
-    departs && ['Departs', f.departTime, place(f.departAirport, f.departTerminal)],
-    arrives && ['Arrives', f.arriveTime, place(f.arriveAirport, f.arriveTerminal)],
-  ]
-    .filter((l): l is string[] => !!l)
-    .map(([verb, time, where]) => [verb, [time, where].filter(Boolean).join(' · ')].filter(Boolean).join(' '))
+  const legs = [
+    f.departDate === date && { verb: 'Departs', time: f.departTime, where: place(f.departAirport, f.departTerminal) },
+    f.arriveDate === date && { verb: 'Arrives', time: f.arriveTime, where: place(f.arriveAirport, f.arriveTerminal) },
+  ].filter((l) => !!l)
   const extra = [f.airline, f.bookingRef && `Ref ${f.bookingRef}`].filter(Boolean).join(' · ')
 
   return (
-    <div className="item">
+    <li className="flight">
       <div>
-        <strong>{[f.label, f.flightNumber].filter(Boolean).join(' · ') || 'Flight'}</strong>
-        {lines.map((l) => (
-          <small key={l}>{l}</small>
+        <strong>
+          <span className="emoji">✈️</span>
+          {[f.label, f.flightNumber].filter(Boolean).join(' · ') || 'Flight'}
+        </strong>
+        {legs.map((l) => (
+          <div className="leg" key={l.verb}>
+            <span className="leg-verb">{l.verb}</span>
+            {l.time && <span className="big-time">{l.time}</span>}
+            {l.where && <span>{l.where}</span>}
+          </div>
         ))}
         {extra && <small>{extra}</small>}
       </div>
-    </div>
+    </li>
   )
 }
 

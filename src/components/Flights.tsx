@@ -29,6 +29,19 @@ function CostField({ label, value, onChange }: { label: string; value: number; o
   )
 }
 
+// The "T" is shown as a fixed prefix so only the number needs typing
+function TerminalField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="narrow">
+      Terminal
+      <div className="prefixed">
+        <span>T</span>
+        <input value={value} onChange={(e) => onChange(e.target.value.replace(/^t\s*(?=\d)/i, ''))} placeholder="3" />
+      </div>
+    </label>
+  )
+}
+
 export function Flights({ trip, onChange }: Props) {
   const [selectedId, setSelectedId] = useState<string | undefined>(trip.flights[0]?.id)
   const flight = trip.flights.find((f) => f.id === selectedId) ?? trip.flights[0]
@@ -41,6 +54,13 @@ export function Flights({ trip, onChange }: Props) {
 
   const update = (patch: Partial<Flight>) =>
     onChange((t) => ({ ...t, flights: t.flights.map((f) => (f.id === flight.id ? { ...f, ...patch } : f)) }))
+
+  // Arrival follows the departure date unless it was deliberately set to a later day (e.g. overnight flights)
+  const setDepartDate = (d: string) =>
+    update({
+      departDate: d,
+      ...(!flight.arriveDate || flight.arriveDate === flight.departDate || flight.arriveDate < d ? { arriveDate: d } : {}),
+    })
 
   const remove = () => {
     if (!confirm(`Delete "${flight.label || 'this flight'}"?`)) return
@@ -87,7 +107,7 @@ export function Flights({ trip, onChange }: Props) {
           <div className="row">
             <label>
               Date
-              <input type="date" value={flight.departDate} onChange={(e) => update({ departDate: e.target.value })} />
+              <input type="date" value={flight.departDate} onChange={(e) => setDepartDate(e.target.value)} />
             </label>
             <label>
               Time
@@ -99,10 +119,7 @@ export function Flights({ trip, onChange }: Props) {
               Airport
               <input value={flight.departAirport} onChange={(e) => update({ departAirport: e.target.value })} placeholder="SIN – Changi" />
             </label>
-            <label className="narrow">
-              Terminal
-              <input value={flight.departTerminal} onChange={(e) => update({ departTerminal: e.target.value })} placeholder="T3" />
-            </label>
+            <TerminalField value={flight.departTerminal} onChange={(v) => update({ departTerminal: v })} />
           </div>
 
           <h4>Arrival</h4>
@@ -121,10 +138,7 @@ export function Flights({ trip, onChange }: Props) {
               Airport
               <input value={flight.arriveAirport} onChange={(e) => update({ arriveAirport: e.target.value })} placeholder="NRT – Narita" />
             </label>
-            <label className="narrow">
-              Terminal
-              <input value={flight.arriveTerminal} onChange={(e) => update({ arriveTerminal: e.target.value })} placeholder="T1" />
-            </label>
+            <TerminalField value={flight.arriveTerminal} onChange={(v) => update({ arriveTerminal: v })} />
           </div>
 
           <label>
