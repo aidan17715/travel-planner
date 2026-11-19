@@ -23,10 +23,35 @@ export interface PackItem {
   packed: boolean
 }
 
-export interface Hotel {
+// A hotel booking covering every day from startDate to endDate (inclusive). cost 0 means "not set".
+export interface Stay {
+  id: string
   name: string
   address: string
   notes: string
+  startDate: string
+  endDate: string
+  checkInTime: string
+  checkOutTime: string
+  cost: number
+}
+
+export interface Flight {
+  id: string
+  label: string
+  airline: string
+  flightNumber: string
+  bookingRef: string
+  departDate: string
+  departTime: string
+  departAirport: string
+  departTerminal: string
+  arriveDate: string
+  arriveTime: string
+  arriveAirport: string
+  arriveTerminal: string
+  notes: string
+  cost: number
 }
 
 export interface Trip {
@@ -38,7 +63,8 @@ export interface Trip {
   currency: string
   budget: number
   itinerary: ItineraryItem[]
-  hotels: Record<string, Hotel>
+  stays: Stay[]
+  flights: Flight[]
   expenses: Expense[]
   packing: PackItem[]
 }

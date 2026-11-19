@@ -94,3 +94,23 @@ a { color: var(--brand); }
 .link { border: none; background: none; color: var(--brand); padding: .25rem .5rem; }
 .inline-form { display: flex; flex-direction: column; gap: .65rem; margin-top: .5rem; padding: .75rem; border-radius: .7rem; background: var(--bg); border: 1px solid var(--border); }
 .inline-form input { background: var(--card); }
+.list li.editing { display: block; padding: 0; background: transparent; border: none; }
+.list li.editing .inline-form { margin-top: 0; }
+.icon-spacer { width: 2.2rem; }
+.row .narrow { flex: 0 0 6rem; }
+.row .grow { flex: 2; }
+
+.flights { display: grid; grid-template-columns: 10rem 1fr; gap: 1rem; align-items: start; margin-top: 1rem; }
+.side-menu { display: flex; flex-direction: column; gap: .4rem; }
+.side-menu button { text-align: left; display: flex; flex-direction: column; gap: .1rem; }
+.side-menu button small { color: inherit; opacity: .75; }
+.side-menu button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.side-menu .add-btn { margin-top: 0; width: 100%; align-items: center; }
+.flight-form { margin: 0; }
+.flight-form h4 { margin: .25rem 0 0; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+@media (max-width: 560px) {
+  .flights { grid-template-columns: 1fr; }
+  .side-menu { flex-direction: row; overflow-x: auto; padding-bottom: .25rem; }
+  .side-menu button { flex: 0 0 auto; }
+}

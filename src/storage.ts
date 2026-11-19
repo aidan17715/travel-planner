@@ -1,23 +1,67 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Trip } from './types.ts'
+import { listDays } from './dates.ts'
+import type { Flight, Stay, Trip } from './types.ts'
 
 const KEY = 'travel-planner:trips:v1'
 
 export const uid = () => crypto.randomUUID()
 
-const normalize = (t: Partial<Trip>): Trip => ({
-  id: t.id ?? uid(),
-  name: t.name ?? 'Untitled trip',
-  destination: t.destination ?? '',
-  startDate: t.startDate ?? '',
-  endDate: t.endDate ?? '',
-  currency: t.currency ?? 'USD',
-  budget: Number(t.budget) || 0,
-  itinerary: t.itinerary ?? [],
-  hotels: t.hotels ?? {},
-  expenses: t.expenses ?? [],
-  packing: t.packing ?? [],
+export const newFlight = (label: string, date: string): Flight => ({
+  id: uid(),
+  label,
+  airline: '',
+  flightNumber: '',
+  bookingRef: '',
+  departDate: date,
+  departTime: '',
+  departAirport: '',
+  departTerminal: '',
+  arriveDate: date,
+  arriveTime: '',
+  arriveAirport: '',
+  arriveTerminal: '',
+  notes: '',
+  cost: 0,
 })
+
+// Every trip starts with an outbound flight on the start date and a return flight on the end date
+export const defaultFlights = (start: string, end: string): Flight[] => [newFlight('Outbound', start), newFlight('Return', end)]
+
+type LegacyHotels = Record<string, { name: string; address: string; notes: string }>
+
+// Earlier versions stored one hotel per day; merge consecutive identical days into a single stay
+function staysFromLegacy(hotels: LegacyHotels): Stay[] {
+  const stays: Stay[] = []
+  for (const date of Object.keys(hotels).sort()) {
+    const h = hotels[date]
+    const last = stays[stays.length - 1]
+    if (last && last.name === h.name && last.address === h.address && last.notes === h.notes && listDays(last.endDate, date).length === 2) {
+      last.endDate = date
+    } else {
+      stays.push({ id: uid(), ...h, startDate: date, endDate: date, checkInTime: '', checkOutTime: '', cost: 0 })
+    }
+  }
+  return stays
+}
+
+const normalize = (t: Partial<Trip> & { hotels?: LegacyHotels }): Trip => {
+  const startDate = t.startDate ?? ''
+  const endDate = t.endDate ?? ''
+  return {
+    id: t.id ?? uid(),
+    name: t.name ?? 'Untitled trip',
+    destination: t.destination ?? '',
+    startDate,
+    endDate,
+    currency: t.currency ?? 'USD',
+    budget: Number(t.budget) || 0,
+    itinerary: t.itinerary ?? [],
+    stays: t.stays ?? (t.hotels ? staysFromLegacy(t.hotels) : []),
+    flights: t.flights ?? defaultFlights(startDate, endDate),
+    expenses: t.expenses ?? [],
+    packing: t.packing ?? [],
+  }
+}
 
 function load(): Trip[] {
   try {

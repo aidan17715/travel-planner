@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Trip } from '../types.ts'
 import { Budget } from './Budget.tsx'
+import { Flights } from './Flights.tsx'
 import { Itinerary } from './Itinerary.tsx'
 import { Packing } from './Packing.tsx'
 
@@ -11,7 +12,7 @@ interface Props {
   onBack: () => void
 }
 
-const TABS = ['Itinerary', 'Budget', 'Packing'] as const
+const TABS = ['Itinerary', 'Flights', 'Budget', 'Packing'] as const
 type Tab = (typeof TABS)[number]
 
 export function TripView({ trip, onChange, onDelete, onBack }: Props) {
@@ -20,6 +21,18 @@ export function TripView({ trip, onChange, onDelete, onBack }: Props) {
   const confirmDelete = () => {
     if (confirm(`Delete "${trip.name}"? This cannot be undone.`)) onDelete()
   }
+
+  // Flights sitting on the old start/end date move along with the trip dates
+  const changeDates = (start: string, end: string) =>
+    onChange((t) => {
+      const shift = (d: string) => (!d ? d : d === t.startDate ? start : d === t.endDate ? end : d)
+      return {
+        ...t,
+        startDate: start,
+        endDate: end,
+        flights: t.flights.map((f) => ({ ...f, departDate: shift(f.departDate), arriveDate: shift(f.arriveDate) })),
+      }
+    })
 
   return (
     <section>
@@ -37,7 +50,7 @@ export function TripView({ trip, onChange, onDelete, onBack }: Props) {
             type="date"
             value={trip.startDate}
             max={trip.endDate || undefined}
-            onChange={(e) => onChange((t) => ({ ...t, startDate: e.target.value }))}
+            onChange={(e) => changeDates(e.target.value, trip.endDate)}
           />
         </label>
         <label>
@@ -46,7 +59,7 @@ export function TripView({ trip, onChange, onDelete, onBack }: Props) {
             type="date"
             value={trip.endDate}
             min={trip.startDate || undefined}
-            onChange={(e) => onChange((t) => ({ ...t, endDate: e.target.value }))}
+            onChange={(e) => changeDates(trip.startDate, e.target.value)}
           />
         </label>
       </div>
@@ -60,6 +73,7 @@ export function TripView({ trip, onChange, onDelete, onBack }: Props) {
       </nav>
 
       {tab === 'Itinerary' && <Itinerary trip={trip} onChange={onChange} />}
+      {tab === 'Flights' && <Flights trip={trip} onChange={onChange} />}
       {tab === 'Budget' && <Budget trip={trip} onChange={onChange} />}
       {tab === 'Packing' && <Packing trip={trip} onChange={onChange} />}
     </section>

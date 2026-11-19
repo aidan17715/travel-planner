@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { uid } from '../storage.ts'
+import { defaultFlights, uid } from '../storage.ts'
 import type { Trip } from '../types.ts'
 
 interface Props {
@@ -30,7 +30,8 @@ export function TripList({ trips, onOpen, onAdd }: Props) {
       currency: currency.trim().toUpperCase() || 'USD',
       budget: Number(budget) || 0,
       itinerary: [],
-      hotels: {},
+      stays: [],
+      flights: defaultFlights(startDate, endDate),
       expenses: [],
       packing: [],
     }

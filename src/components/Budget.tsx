@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatMoney } from '../money.ts'
 import { uid } from '../storage.ts'
 import { EXPENSE_CATEGORIES, type Expense, type ExpenseCategory, type Trip } from '../types.ts'
 
@@ -7,26 +8,44 @@ interface Props {
   onChange: (patch: (t: Trip) => Trip) => void
 }
 
+interface Line {
+  id: string
+  description: string
+  category: ExpenseCategory
+  amount: number
+  // Set for costs that come from the Itinerary or Flights tabs; those are edited there
+  source?: string
+}
+
 export function Budget({ trip, onChange }: Props) {
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<ExpenseCategory>('Food')
   const [amount, setAmount] = useState('')
 
-  // Falls back to a plain format if the currency code isn't a valid ISO code
-  const money = (n: number) => {
-    try {
-      return new Intl.NumberFormat(undefined, { style: 'currency', currency: trip.currency }).format(n)
-    } catch {
-      return `${trip.currency} ${n.toFixed(2)}`
-    }
-  }
+  const money = (n: number) => formatMoney(n, trip.currency)
 
-  const total = trip.expenses.reduce((s, e) => s + e.amount, 0)
+  const lines: Line[] = [
+    ...trip.stays
+      .filter((s) => s.cost > 0)
+      .map((s) => ({ id: `stay-${s.id}`, description: s.name, category: 'Stay' as const, amount: s.cost, source: 'Hotel' })),
+    ...trip.flights
+      .filter((f) => f.cost > 0)
+      .map((f) => ({
+        id: `flight-${f.id}`,
+        description: [f.label, f.flightNumber].filter(Boolean).join(' · ') || 'Flight',
+        category: 'Flights' as const,
+        amount: f.cost,
+        source: 'Flights tab',
+      })),
+    ...trip.expenses,
+  ]
+
+  const total = lines.reduce((s, e) => s + e.amount, 0)
   const remaining = trip.budget - total
   const pct = trip.budget > 0 ? Math.min(100, (total / trip.budget) * 100) : 0
   const byCategory = EXPENSE_CATEGORIES.map((c) => ({
     c,
-    sum: trip.expenses.filter((e) => e.category === c).reduce((s, e) => s + e.amount, 0),
+    sum: lines.filter((e) => e.category === c).reduce((s, e) => s + e.amount, 0),
   })).filter((x) => x.sum > 0)
 
   const add = (e: React.FormEvent) => {
@@ -99,14 +118,18 @@ export function Budget({ trip, onChange }: Props) {
       </form>
 
       <ul className="list">
-        {trip.expenses.map((x) => (
+        {lines.map((x) => (
           <li key={x.id}>
             <div>
               <strong>{x.description}</strong>
-              <small>{x.category}</small>
+              <small>{x.source ? `${x.category} · from ${x.source}` : x.category}</small>
             </div>
             <span>{money(x.amount)}</span>
-            <button className="icon" aria-label={`Delete ${x.description}`} onClick={() => remove(x.id)}>✕</button>
+            {x.source ? (
+              <span className="icon-spacer" />
+            ) : (
+              <button className="icon" aria-label={`Delete ${x.description}`} onClick={() => remove(x.id)}>✕</button>
+            )}
           </li>
         ))}
       </ul>
