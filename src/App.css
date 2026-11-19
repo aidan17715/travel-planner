@@ -97,6 +97,7 @@ a { color: var(--brand); }
 .list li.editing { display: block; padding: 0; background: transparent; border: none; }
 .list li.editing .inline-form { margin-top: 0; }
 .icon-spacer { width: 2.2rem; }
+.emoji { margin-right: .35rem; }
 .row .narrow { flex: 0 0 6rem; }
 .row .grow { flex: 2; }
 

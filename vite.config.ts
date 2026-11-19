@@ -15,7 +15,7 @@ export default defineConfig({
       manifest: {
         name: 'Travel Planner',
         short_name: 'Trips',
-        description: 'Plan trips, itineraries, budgets and packing lists. Works offline.',
+        description: 'Plan trips, itineraries, flights and budgets. Works offline.',
         theme_color: '#0e7490',
         background_color: '#f1f5f9',
         display: 'standalone',

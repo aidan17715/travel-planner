@@ -1,6 +1,6 @@
 # Travel Planner
 
-A simple, installable travel planner: trips, day-by-day itinerary, budget tracker and packing list. Works offline and stores data on your device.
+A simple, installable travel planner: trips, a day-by-day itinerary with hotels and flights, and a budget tracker. Works offline and stores data on your device.
 
 **Live app:** https://aidan17715.github.io/travel-planner/
 

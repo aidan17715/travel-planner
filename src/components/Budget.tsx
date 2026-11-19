@@ -37,6 +37,9 @@ export function Budget({ trip, onChange }: Props) {
         amount: f.cost,
         source: 'Flights tab',
       })),
+    ...trip.itinerary
+      .filter((a) => a.cost > 0)
+      .map((a) => ({ id: `activity-${a.id}`, description: a.title, category: 'Activities' as const, amount: a.cost, source: 'Itinerary' })),
     ...trip.expenses,
   ]
 

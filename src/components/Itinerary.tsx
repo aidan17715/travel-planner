@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { fmtDate, listDays } from '../dates.ts'
+import { activityEmoji } from '../emoji.ts'
 import { formatMoney } from '../money.ts'
 import { uid } from '../storage.ts'
-import type { ItineraryItem, Stay, Trip } from '../types.ts'
+import type { Flight, ItineraryItem, Stay, Trip } from '../types.ts'
 
 type OnChange = (patch: (t: Trip) => Trip) => void
 
@@ -15,9 +16,13 @@ export function Itinerary({ trip, onChange }: Props) {
   const days = listDays(trip.startDate, trip.endDate)
   const inRange = new Set(days)
 
-  // Activities and hotel dates outside the trip range stay visible so nothing is lost
+  // Anything dated outside the trip range stays visible so nothing is lost
   const strayDates = [
-    ...new Set([...trip.itinerary.map((i) => i.date), ...trip.stays.flatMap((s) => [s.startDate, s.endDate]).filter(Boolean)]),
+    ...new Set([
+      ...trip.itinerary.map((i) => i.date),
+      ...trip.stays.flatMap((s) => [s.startDate, s.endDate]).filter(Boolean),
+      ...trip.flights.flatMap((f) => [f.departDate, f.arriveDate]).filter(Boolean),
+    ]),
   ]
     .filter((d) => !inRange.has(d))
     .sort()
@@ -53,6 +58,11 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
   const [editingStay, setEditingStay] = useState<string | null>(null)
 
   const stays = date ? trip.stays.filter((s) => s.startDate <= date && date <= s.endDate) : []
+  const flights = date
+    ? trip.flights
+        .filter((f) => f.departDate === date || f.arriveDate === date)
+        .sort((a, b) => flightTime(a, date).localeCompare(flightTime(b, date)))
+    : []
   const activities = trip.itinerary
     .filter((i) => i.date === date)
     .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
@@ -71,6 +81,15 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
         <span>{label}</span>
         <span className="day-date">{fmtDate(date)}</span>
       </h3>
+
+      {flights.length > 0 && (
+        <section>
+          <h4>✈️ Flights</h4>
+          {flights.map((f) => (
+            <FlightRow key={f.id} flight={f} date={date} />
+          ))}
+        </section>
+      )}
 
       {date && (
         <section>
@@ -145,6 +164,7 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
               <li key={a.id} className="editing">
                 <ActivityForm
                   initial={a}
+                  currency={trip.currency}
                   onCancel={() => setEditingActivity(null)}
                   onSave={(values) => {
                     onChange((t) => ({ ...t, itinerary: t.itinerary.map((x) => (x.id === a.id ? { ...x, ...values } : x)) }))
@@ -155,13 +175,17 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
             ) : (
               <li key={a.id}>
                 <div>
-                  <strong>{a.time && <span className="time">{a.time}</span>} {a.title}</strong>
+                  <strong>
+                    <span className="emoji">{activityEmoji(a.title, a.location)}</span>
+                    {a.time && <span className="time">{a.time}</span>} {a.title}
+                  </strong>
                   {a.location && (
                     <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.location + ' ' + trip.destination)}`} target="_blank" rel="noreferrer">
                       📍 {a.location}
                     </a>
                   )}
                   {a.notes && <small>{a.notes}</small>}
+                  {a.cost > 0 && <small>💰 {formatMoney(a.cost, trip.currency)}</small>}
                 </div>
                 <div className="item-actions">
                   <button className="link" onClick={() => setEditingActivity(a.id)}>Edit</button>
@@ -174,6 +198,7 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
 
         {addingActivity ? (
           <ActivityForm
+            currency={trip.currency}
             onCancel={() => setAddingActivity(false)}
             onSave={(values) => {
               onChange((t) => ({ ...t, itinerary: [...t.itinerary, { id: uid(), date, ...values }] }))
@@ -188,18 +213,56 @@ function DayCard({ trip, date, label, days, onChange }: DayProps) {
   )
 }
 
-type ActivityValues = Pick<ItineraryItem, 'time' | 'title' | 'location' | 'notes'>
+type ActivityValues = Pick<ItineraryItem, 'time' | 'title' | 'location' | 'notes' | 'cost'>
 
-function ActivityForm({ initial, onSave, onCancel }: { initial?: ItineraryItem; onSave: (v: ActivityValues) => void; onCancel: () => void }) {
+const sortTime = (t: string) => t || '99:99'
+
+const flightTime = (f: Flight, date: string) => sortTime(f.departDate === date ? f.departTime : f.arriveTime)
+
+const place = (airport: string, terminal: string) => [airport, terminal && `(${terminal})`].filter(Boolean).join(' ')
+
+function FlightRow({ flight: f, date }: { flight: Flight; date: string }) {
+  const departs = f.departDate === date
+  const arrives = f.arriveDate === date
+  const lines = [
+    departs && ['Departs', f.departTime, place(f.departAirport, f.departTerminal)],
+    arrives && ['Arrives', f.arriveTime, place(f.arriveAirport, f.arriveTerminal)],
+  ]
+    .filter((l): l is string[] => !!l)
+    .map(([verb, time, where]) => [verb, [time, where].filter(Boolean).join(' · ')].filter(Boolean).join(' '))
+  const extra = [f.airline, f.bookingRef && `Ref ${f.bookingRef}`].filter(Boolean).join(' · ')
+
+  return (
+    <div className="item">
+      <div>
+        <strong>{[f.label, f.flightNumber].filter(Boolean).join(' · ') || 'Flight'}</strong>
+        {lines.map((l) => (
+          <small key={l}>{l}</small>
+        ))}
+        {extra && <small>{extra}</small>}
+      </div>
+    </div>
+  )
+}
+
+interface ActivityFormProps {
+  initial?: ItineraryItem
+  currency: string
+  onSave: (v: ActivityValues) => void
+  onCancel: () => void
+}
+
+function ActivityForm({ initial, currency, onSave, onCancel }: ActivityFormProps) {
   const [time, setTime] = useState(initial?.time ?? '')
   const [title, setTitle] = useState(initial?.title ?? '')
   const [location, setLocation] = useState(initial?.location ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
+  const [cost, setCost] = useState(initial?.cost ? String(initial.cost) : '')
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
-    onSave({ time, title: title.trim(), location: location.trim(), notes: notes.trim() })
+    onSave({ time, title: title.trim(), location: location.trim(), notes: notes.trim(), cost: Number(cost) > 0 ? Number(cost) : 0 })
   }
 
   return (
@@ -221,6 +284,10 @@ function ActivityForm({ initial, onSave, onCancel }: { initial?: ItineraryItem; 
       <label>
         Notes
         <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Booking ref, tips..." />
+      </label>
+      <label>
+        Cost, {currency}
+        <input type="number" min="0" step="0.01" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Added to your budget" />
       </label>
       <div className="row">
         <button type="submit" className="primary">Save activity</button>
@@ -322,11 +389,11 @@ function StayForm({ initial, days, defaultDate, currency, onSave, onCancel }: St
 
       <div className="row">
         <label>
-          Check-in time (optional)
+          Check-in time
           <input type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
         </label>
         <label>
-          Check-out time (optional)
+          Check-out time
           <input type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
         </label>
       </div>
@@ -335,7 +402,7 @@ function StayForm({ initial, days, defaultDate, currency, onSave, onCancel }: St
         <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Booking ref..." />
       </label>
       <label>
-        Total cost for the stay, {currency} (optional)
+        Total cost for the stay, {currency}
         <input type="number" min="0" step="0.01" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Added to your budget" />
       </label>
 

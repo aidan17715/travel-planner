@@ -55,11 +55,10 @@ const normalize = (t: Partial<Trip> & { hotels?: LegacyHotels }): Trip => {
     endDate,
     currency: t.currency ?? 'USD',
     budget: Number(t.budget) || 0,
-    itinerary: t.itinerary ?? [],
+    itinerary: (t.itinerary ?? []).map((i) => ({ ...i, cost: Number(i.cost) || 0 })),
     stays: t.stays ?? (t.hotels ? staysFromLegacy(t.hotels) : []),
     flights: t.flights ?? defaultFlights(startDate, endDate),
     expenses: t.expenses ?? [],
-    packing: t.packing ?? [],
   }
 }
 

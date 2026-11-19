@@ -5,6 +5,7 @@ export interface ItineraryItem {
   title: string
   location: string
   notes: string
+  cost: number
 }
 
 export const EXPENSE_CATEGORIES = ['Flights', 'Stay', 'Food', 'Transport', 'Activities', 'Shopping', 'Other'] as const
@@ -15,12 +16,6 @@ export interface Expense {
   description: string
   category: ExpenseCategory
   amount: number
-}
-
-export interface PackItem {
-  id: string
-  label: string
-  packed: boolean
 }
 
 // A hotel booking covering every day from startDate to endDate (inclusive). cost 0 means "not set".
@@ -66,5 +61,4 @@ export interface Trip {
   stays: Stay[]
   flights: Flight[]
   expenses: Expense[]
-  packing: PackItem[]
 }

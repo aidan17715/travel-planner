@@ -3,7 +3,6 @@ import type { Trip } from '../types.ts'
 import { Budget } from './Budget.tsx'
 import { Flights } from './Flights.tsx'
 import { Itinerary } from './Itinerary.tsx'
-import { Packing } from './Packing.tsx'
 
 interface Props {
   trip: Trip
@@ -12,7 +11,7 @@ interface Props {
   onBack: () => void
 }
 
-const TABS = ['Itinerary', 'Flights', 'Budget', 'Packing'] as const
+const TABS = ['Itinerary', 'Flights', 'Budget'] as const
 type Tab = (typeof TABS)[number]
 
 export function TripView({ trip, onChange, onDelete, onBack }: Props) {
@@ -75,7 +74,6 @@ export function TripView({ trip, onChange, onDelete, onBack }: Props) {
       {tab === 'Itinerary' && <Itinerary trip={trip} onChange={onChange} />}
       {tab === 'Flights' && <Flights trip={trip} onChange={onChange} />}
       {tab === 'Budget' && <Budget trip={trip} onChange={onChange} />}
-      {tab === 'Packing' && <Packing trip={trip} onChange={onChange} />}
     </section>
   )
 }
